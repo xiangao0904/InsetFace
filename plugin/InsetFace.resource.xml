@@ -8,6 +8,7 @@
     <string id="Mode">モード</string>
     <string id="ModeRegion">リージョン</string>
     <string id="ModeIndividual">個別</string>
+    <string id="EvenOffset">均等オフセット</string>
     <string id="Apply">適用</string>
     <string id="Cancel">キャンセル</string>
     <string id="StatusFormat">面のインセット  面数:%u  厚み: %.3f  深さ: %.3f  モード:%s</string>
@@ -35,6 +36,7 @@
     <string id="Mode">模式</string>
     <string id="ModeRegion">区域</string>
     <string id="ModeIndividual">单独</string>
+    <string id="EvenOffset">均等偏移</string>
     <string id="Apply">应用</string>
     <string id="Cancel">取消</string>
     <string id="StatusFormat">面内插  面数:%u  厚度: %.3f  深度: %.3f  模式:%s</string>
@@ -62,6 +64,7 @@
     <string id="Mode">Mode</string>
     <string id="ModeRegion">Region</string>
     <string id="ModeIndividual">Individual</string>
+    <string id="EvenOffset">Offset Even</string>
     <string id="Apply">Apply</string>
     <string id="Cancel">Cancel</string>
     <string id="StatusFormat">Inset Face  Faces:%u  Thickness: %.3f  Depth: %.3f  Mode:%s</string>

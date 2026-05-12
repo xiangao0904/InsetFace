@@ -94,6 +94,9 @@ struct AppState
 	HICON AppIconLarge;
 	HICON AppIconSmall;
 	HBRUSH BackgroundBrush;
+	HBRUSH CardBrush;
+	HBRUSH InputBrush;
+	HBRUSH AccentBrush;
 };
 
 AppState* g_app = NULL;
@@ -1397,14 +1400,125 @@ static HFONT CreateUiFont(int height, int weight, bool italic, const wchar_t* fa
 	return CreateFontIndirectW(&font);
 }
 
+static bool IsPrimaryButton(HWND handle)
+{
+	return g_app != NULL && handle == g_app->InstallButton;
+}
+
+static void FillRoundedRect(HDC hdc, const RECT& rect, COLORREF fill_color, COLORREF border_color, int radius)
+{
+	HPEN pen = CreatePen(PS_SOLID, 1, border_color);
+	HBRUSH brush = CreateSolidBrush(fill_color);
+	HPEN old_pen = static_cast<HPEN>(SelectObject(hdc, pen));
+	HBRUSH old_brush = static_cast<HBRUSH>(SelectObject(hdc, brush));
+	RoundRect(hdc, rect.left, rect.top, rect.right, rect.bottom, radius, radius);
+	SelectObject(hdc, old_brush);
+	SelectObject(hdc, old_pen);
+	DeleteObject(brush);
+	DeleteObject(pen);
+}
+
+static void DrawInstallerCard(HDC hdc, const RECT& rect)
+{
+	FillRoundedRect(hdc, rect, RGB(255, 255, 255), RGB(220, 227, 235), 18);
+}
+
+static RECT MakeRect(int left, int top, int width, int height)
+{
+	RECT rect = { left, top, left + width, top + height };
+	return rect;
+}
+
+static void PaintInstallerWindow(HWND window)
+{
+	PAINTSTRUCT paint = {};
+	HDC hdc = BeginPaint(window, &paint);
+	if (hdc == NULL) {
+		return;
+	}
+
+	RECT client = {};
+	GetClientRect(window, &client);
+	FillRect(hdc, &client, g_app->BackgroundBrush);
+
+	const int margin = 20;
+	const int content_width = (client.right - client.left) - margin * 2;
+	RECT hero_card = MakeRect(margin, 18, content_width, 92);
+	RECT path_card = MakeRect(margin, 120, content_width, 86);
+	RECT action_card = MakeRect(margin, 222, content_width, 62);
+	RECT log_card = MakeRect(margin, 294, content_width, (client.bottom - 314) > 120 ? (client.bottom - 314) : 120);
+
+	DrawInstallerCard(hdc, hero_card);
+	DrawInstallerCard(hdc, path_card);
+	DrawInstallerCard(hdc, action_card);
+	DrawInstallerCard(hdc, log_card);
+
+	RECT hero_accent = hero_card;
+	hero_accent.bottom = hero_accent.top + 8;
+	FillRoundedRect(hdc, hero_accent, RGB(37, 99, 235), RGB(37, 99, 235), 14);
+
+	RECT path_shell = MakeRect(30, 150, content_width - 40, 50);
+	RECT log_shell = MakeRect(30, 336, content_width - 40, log_card.bottom - 336 - 10);
+	FillRoundedRect(hdc, path_shell, RGB(248, 250, 252), RGB(214, 223, 233), 16);
+	FillRoundedRect(hdc, log_shell, RGB(248, 250, 252), RGB(214, 223, 233), 16);
+
+	EndPaint(window, &paint);
+}
+
+static void DrawButtonFrame(DRAWITEMSTRUCT* draw)
+{
+	const bool primary = IsPrimaryButton(draw->hwndItem);
+	const bool disabled = (draw->itemState & ODS_DISABLED) != 0;
+	const bool pressed = (draw->itemState & ODS_SELECTED) != 0;
+
+	COLORREF fill = RGB(255, 255, 255);
+	COLORREF border = RGB(197, 206, 216);
+	COLORREF text = RGB(36, 42, 49);
+
+	if (primary) {
+		fill = pressed ? RGB(29, 94, 214) : RGB(37, 99, 235);
+		border = fill;
+		text = RGB(255, 255, 255);
+	}
+	if (!primary && pressed) {
+		fill = RGB(243, 247, 251);
+		border = RGB(166, 177, 191);
+	}
+	if (disabled) {
+		fill = primary ? RGB(162, 193, 245) : RGB(244, 246, 248);
+		border = RGB(214, 220, 227);
+		text = RGB(142, 149, 158);
+	}
+
+	RECT rect = draw->rcItem;
+	FillRoundedRect(draw->hDC, rect, fill, border, 14);
+
+	SetBkMode(draw->hDC, TRANSPARENT);
+	SetTextColor(draw->hDC, text);
+	HFONT old_font = static_cast<HFONT>(SelectObject(draw->hDC, g_app->UiFont));
+	RECT text_rect = rect;
+	if (pressed) {
+		OffsetRect(&text_rect, 0, 1);
+	}
+	DrawTextW(draw->hDC, L"", 0, &text_rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+	wchar_t text_buffer[128] = {};
+	GetWindowTextW(draw->hwndItem, text_buffer, 128);
+	DrawTextW(draw->hDC, text_buffer, -1, &text_rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+	SelectObject(draw->hDC, old_font);
+}
+
 static void InitializeVisuals()
 {
 	if (g_app == NULL) return;
 
-	g_app->HeaderFont = CreateUiFont(-24, FW_SEMIBOLD, false, L"Segoe UI");
-	g_app->HintFont = CreateUiFont(-15, FW_NORMAL, false, L"Segoe UI");
-	g_app->MonoFont = CreateUiFont(-15, FW_NORMAL, false, L"Consolas");
+	g_app->HeaderFont = CreateUiFont(-28, FW_SEMIBOLD, false, L"Segoe UI");
+	g_app->HintFont = CreateUiFont(-16, FW_NORMAL, false, L"Segoe UI");
+	g_app->MonoFont = CreateUiFont(-16, FW_NORMAL, false, L"Segoe UI");
 	g_app->BackgroundBrush = CreateSolidBrush(RGB(245, 247, 250));
+	g_app->CardBrush = CreateSolidBrush(RGB(255, 255, 255));
+	g_app->InputBrush = CreateSolidBrush(RGB(255, 255, 255));
+	g_app->AccentBrush = CreateSolidBrush(RGB(37, 99, 235));
 	g_app->AppIconLarge = static_cast<HICON>(LoadImageW(g_app->Instance, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON, 48, 48, LR_DEFAULTCOLOR));
 	g_app->AppIconSmall = static_cast<HICON>(LoadImageW(g_app->Instance, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON, 20, 20, LR_DEFAULTCOLOR));
 
@@ -1415,34 +1529,34 @@ static void InitializeVisuals()
 
 static void CreateChildControls()
 {
-	g_app->BrandIcon = CreateAppControl(WS_CHILD | WS_VISIBLE | SS_ICON, 0, L"STATIC", L"", 20, 20, 48, 48, IDC_BRAND_ICON);
+	g_app->BrandIcon = CreateAppControl(WS_CHILD | WS_VISIBLE | SS_ICON, 0, L"STATIC", L"", 28, 26, 56, 56, IDC_BRAND_ICON);
 	SendMessageW(g_app->BrandIcon, STM_SETICON, reinterpret_cast<WPARAM>(g_app->AppIconLarge), 0);
 
-	g_app->HeaderLabel = CreateAppControl(WS_CHILD | WS_VISIBLE, 0, L"STATIC", L"InsetFace setup", 82, 18, 420, 28, IDC_HEADER_TITLE);
+	g_app->HeaderLabel = CreateAppControl(WS_CHILD | WS_VISIBLE, 0, L"STATIC", L"InsetFace setup", 102, 28, 420, 32, IDC_HEADER_TITLE);
 	SendMessageW(g_app->HeaderLabel, WM_SETFONT, reinterpret_cast<WPARAM>(g_app->HeaderFont), TRUE);
 
-	g_app->HintLabel = CreateAppControl(WS_CHILD | WS_VISIBLE, 0, L"STATIC", L"Auto-detect a Metasequoia install, or point the installer at Metaseq.exe manually.", 82, 48, 560, 22, IDC_HEADER_HINT);
+	g_app->HintLabel = CreateAppControl(WS_CHILD | WS_VISIBLE, 0, L"STATIC", L"Auto-detect a Metasequoia install, or point the installer at Metaseq.exe manually.", 102, 64, 590, 24, IDC_HEADER_HINT);
 	SendMessageW(g_app->HintLabel, WM_SETFONT, reinterpret_cast<WPARAM>(g_app->HintFont), TRUE);
 
-	CreateAppControl(WS_CHILD | WS_VISIBLE, 0, L"STATIC", L"Metasequoia root", 20, 96, 180, 20, 0);
-	g_app->PathEdit = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, WS_EX_CLIENTEDGE, L"EDIT", L"", 20, 120, 520, 30, IDC_ROOT_PATH);
+	CreateAppControl(WS_CHILD | WS_VISIBLE, 0, L"STATIC", L"Metasequoia root", 36, 132, 180, 20, 0);
+	g_app->PathEdit = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 0, L"EDIT", L"", 36, 160, 520, 34, IDC_ROOT_PATH);
 	SendMessageW(g_app->PathEdit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(8, 8));
-	g_app->BrowseButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 0, L"BUTTON", L"Browse...", 552, 120, 112, 30, IDC_BROWSE);
+	g_app->BrowseButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, L"BUTTON", L"Browse...", 572, 162, 120, 34, IDC_BROWSE);
 
-	g_app->InstallButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON, 0, L"BUTTON", L"Install / Update", 20, 168, 170, 34, IDC_INSTALL);
-	g_app->RepairButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 0, L"BUTTON", L"Repair", 202, 168, 120, 34, IDC_REPAIR);
-	g_app->UninstallButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 0, L"BUTTON", L"Uninstall", 334, 168, 120, 34, IDC_UNINSTALL);
+	g_app->InstallButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, L"BUTTON", L"Install / Update", 36, 226, 184, 40, IDC_INSTALL);
+	g_app->RepairButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, L"BUTTON", L"Repair", 232, 226, 128, 40, IDC_REPAIR);
+	g_app->UninstallButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, L"BUTTON", L"Uninstall", 372, 226, 128, 40, IDC_UNINSTALL);
 
-	g_app->StatusLabel = CreateAppControl(WS_CHILD | WS_VISIBLE, 0, L"STATIC", L"Activity log", 20, 224, 160, 20, IDC_SECTION_STATUS);
+	g_app->StatusLabel = CreateAppControl(WS_CHILD | WS_VISIBLE, 0, L"STATIC", L"Activity log", 36, 314, 160, 20, IDC_SECTION_STATUS);
 	g_app->StatusEdit = CreateAppControl(
 		WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_VSCROLL,
-		WS_EX_CLIENTEDGE,
+		0,
 		L"EDIT",
 		L"",
-		20,
-		248,
-		644,
-		262,
+		36,
+		342,
+		656,
+		210,
 		IDC_STATUS);
 	SendMessageW(g_app->StatusEdit, WM_SETFONT, reinterpret_cast<WPARAM>(g_app->MonoFont), TRUE);
 	SendMessageW(g_app->StatusEdit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(10, 10));
@@ -1451,10 +1565,43 @@ static void CreateChildControls()
 static LRESULT CALLBACK MainWindowProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam)
 {
 	switch (message) {
+	case WM_ERASEBKGND:
+		return 1;
+	case WM_PAINT:
+		if (g_app != NULL) {
+			PaintInstallerWindow(window);
+			return 0;
+		}
+		break;
+	case WM_DRAWITEM:
+		if (g_app != NULL) {
+			DRAWITEMSTRUCT* draw = reinterpret_cast<DRAWITEMSTRUCT*>(lparam);
+			if (draw != NULL && draw->CtlType == ODT_BUTTON) {
+				DrawButtonFrame(draw);
+				return TRUE;
+			}
+		}
+		break;
+	case WM_CTLCOLOREDIT:
+		if (g_app != NULL) {
+			HDC hdc = reinterpret_cast<HDC>(wparam);
+			SetBkMode(hdc, OPAQUE);
+			SetBkColor(hdc, RGB(255, 255, 255));
+			SetTextColor(hdc, RGB(35, 41, 49));
+			return reinterpret_cast<LRESULT>(g_app->InputBrush);
+		}
+		break;
 	case WM_CTLCOLORSTATIC:
 		if (g_app != NULL) {
 			HDC hdc = reinterpret_cast<HDC>(wparam);
 			HWND control = reinterpret_cast<HWND>(lparam);
+			if (control == g_app->StatusEdit) {
+				SetBkMode(hdc, OPAQUE);
+				SetBkColor(hdc, RGB(255, 255, 255));
+				SetTextColor(hdc, RGB(35, 41, 49));
+				return reinterpret_cast<LRESULT>(g_app->InputBrush);
+			}
+
 			SetBkMode(hdc, TRANSPARENT);
 			if (control == g_app->HeaderLabel) {
 				SetTextColor(hdc, RGB(23, 43, 77));
@@ -1465,7 +1612,7 @@ static LRESULT CALLBACK MainWindowProc(HWND window, UINT message, WPARAM wparam,
 			else {
 				SetTextColor(hdc, RGB(44, 52, 64));
 			}
-			return reinterpret_cast<LRESULT>(g_app->BackgroundBrush);
+			return reinterpret_cast<LRESULT>(GetStockObject(NULL_BRUSH));
 		}
 		break;
 	case WM_COMMAND:
@@ -1573,6 +1720,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int show_command)
 	if (app.AppIconLarge != NULL) DestroyIcon(app.AppIconLarge);
 	if (app.AppIconSmall != NULL) DestroyIcon(app.AppIconSmall);
 	if (app.BackgroundBrush != NULL) DeleteObject(app.BackgroundBrush);
+	if (app.CardBrush != NULL) DeleteObject(app.CardBrush);
+	if (app.InputBrush != NULL) DeleteObject(app.InputBrush);
+	if (app.AccentBrush != NULL) DeleteObject(app.AccentBrush);
 
 	return static_cast<int>(message.wParam);
 }

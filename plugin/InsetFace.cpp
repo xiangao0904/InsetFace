@@ -261,9 +261,10 @@ struct InsetParameters
 
 	double Thickness;
 	double Depth;
+	bool EvenOffset;
 	Mode CurrentMode;
 
-	InsetParameters() : Thickness(0.0), Depth(0.0), CurrentMode(ModeRegion) {}
+	InsetParameters() : Thickness(0.0), Depth(0.0), EvenOffset(false), CurrentMode(ModeRegion) {}
 };
 
 struct SelectedFaceRef
@@ -446,6 +447,7 @@ public:
 	BOOL DepthChanged(MQWidgetBase* sender, MQDocument doc);
 	BOOL RegionModeChanged(MQWidgetBase* sender, MQDocument doc);
 	BOOL IndividualModeChanged(MQWidgetBase* sender, MQDocument doc);
+	BOOL EvenOffsetChanged(MQWidgetBase* sender, MQDocument doc);
 	BOOL ApplyClicked(MQWidgetBase* sender, MQDocument doc);
 	BOOL CancelClicked(MQWidgetBase* sender, MQDocument doc);
 
@@ -457,6 +459,7 @@ private:
 	MQDoubleSpinBox* m_Depth;
 	MQRadioButton* m_RegionMode;
 	MQRadioButton* m_IndividualMode;
+	MQCheckBox* m_EvenOffset;
 	MQButton* m_ApplyButton;
 	MQButton* m_CancelButton;
 	bool m_Syncing;
@@ -558,7 +561,7 @@ private:
 	bool FitLocalPlane(TempRegion& region, const std::vector<FaceInfo>& faces);
 	void ProjectRegionVertices(TempRegion& region);
 	bool ExtractBoundaryLoops(TempRegion& region);
-	bool OffsetLoop2D(const std::vector<Point2D>& loop_points, double signed_thickness, std::vector<Point2D>& out_points, std::wstring& warning) const;
+	bool OffsetLoop2D(const std::vector<Point2D>& loop_points, double signed_thickness, bool even_offset, std::vector<Point2D>& out_points, std::wstring& warning) const;
 	bool SolveRegionInterior2D(TempRegion& region, double thickness, double depth);
 	MQPoint LiftPoint(const TempRegion& region, const Point2D& point) const;
 
@@ -572,6 +575,7 @@ private:
 		const std::vector<MQCoordinate>& uv,
 		double thickness,
 		double depth,
+		bool even_offset,
 		std::vector<MQPoint>& inner_points,
 		std::vector<MQCoordinate>& inner_uv,
 		MQPoint* out_face_normal);
@@ -615,6 +619,10 @@ InsetFaceWindow::InsetFaceWindow(int id, InsetFacePlugin* plugin)
 	m_RegionMode->AddChangedEvent(this, &InsetFaceWindow::RegionModeChanged);
 	m_IndividualMode->AddChangedEvent(this, &InsetFaceWindow::IndividualModeChanged);
 
+	MQFrame* option_frame = CreateHorizontalFrame(root);
+	m_EvenOffset = CreateCheckBox(option_frame, m_Plugin->LocalizedText("EvenOffset", L"Offset Even"));
+	m_EvenOffset->AddChangedEvent(this, &InsetFaceWindow::EvenOffsetChanged);
+
 	MQFrame* button_frame = CreateHorizontalFrame(root);
 	button_frame->SetUniformSize(true);
 	m_ApplyButton = CreateButton(button_frame, m_Plugin->LocalizedText("Apply", L"Apply"));
@@ -636,6 +644,7 @@ void InsetFaceWindow::SyncFromPlugin()
 	m_Depth->SetPosition(m_Plugin->m_Params.Depth);
 	m_RegionMode->SetChecked(m_Plugin->m_Params.CurrentMode == InsetParameters::ModeRegion);
 	m_IndividualMode->SetChecked(m_Plugin->m_Params.CurrentMode == InsetParameters::ModeIndividual);
+	m_EvenOffset->SetChecked(m_Plugin->m_Params.EvenOffset);
 	m_Syncing = false;
 }
 
@@ -677,6 +686,16 @@ BOOL InsetFaceWindow::IndividualModeChanged(MQWidgetBase* sender, MQDocument doc
 	if (!m_IndividualMode->GetChecked()) return FALSE;
 	m_RegionMode->SetChecked(false);
 	m_Plugin->m_Params.CurrentMode = InsetParameters::ModeIndividual;
+	m_Plugin->InvalidatePreview();
+	m_Plugin->SetStatus();
+	m_Plugin->RedrawAllScene();
+	return FALSE;
+}
+
+BOOL InsetFaceWindow::EvenOffsetChanged(MQWidgetBase* sender, MQDocument doc)
+{
+	if (m_Syncing) return FALSE;
+	m_Plugin->m_Params.EvenOffset = m_EvenOffset->GetChecked();
 	m_Plugin->InvalidatePreview();
 	m_Plugin->SetStatus();
 	m_Plugin->RedrawAllScene();
@@ -767,6 +786,7 @@ BOOL InsetFacePlugin::Activate(MQDocument doc, BOOL flag)
 {
 	if (flag) {
 		LoadResource();
+		m_Params.EvenOffset = false;
 		ResetToolState(false);
 		SyncSelectionFromDocument(doc);
 		m_Window = new InsetFaceWindow(MQWindow::GetSystemWidgetID(MQSystemWidget::OptionPanel), this);
@@ -1078,6 +1098,7 @@ bool InsetFacePlugin::ComputeInsetPolygon(
 	const std::vector<MQCoordinate>& uv,
 	double thickness,
 	double depth,
+	bool even_offset,
 	std::vector<MQPoint>& inner_points,
 	std::vector<MQCoordinate>& inner_uv,
 	MQPoint* out_face_normal)
@@ -1119,7 +1140,7 @@ bool InsetFacePlugin::ComputeInsetPolygon(
 	std::vector<Point2D> inset_2d;
 	std::wstring warning;
 	InsetFacePlugin temp_plugin;
-	if (!temp_plugin.OffsetLoop2D(polygon_2d, thickness, inset_2d, warning)) {
+	if (!temp_plugin.OffsetLoop2D(polygon_2d, thickness, even_offset, inset_2d, warning)) {
 		return false;
 	}
 
@@ -1191,7 +1212,7 @@ bool InsetFacePlugin::BuildFaceLocalInset(TempRegion& region, TempFace& face)
 
 	std::vector<MQCoordinate> inner_uv;
 	MQPoint face_normal;
-	if (!ComputeInsetPolygon(polygon, face.UV, m_Params.Thickness, 0.0, face.LocalInsetPoints, inner_uv, &face_normal)) {
+	if (!ComputeInsetPolygon(polygon, face.UV, m_Params.Thickness, 0.0, m_Params.EvenOffset, face.LocalInsetPoints, inner_uv, &face_normal)) {
 		return false;
 	}
 
@@ -1409,7 +1430,7 @@ bool InsetFacePlugin::ExtractBoundaryLoops(TempRegion& region)
 	return true;
 }
 
-bool InsetFacePlugin::OffsetLoop2D(const std::vector<Point2D>& loop_points, double signed_thickness, std::vector<Point2D>& out_points, std::wstring& warning) const
+bool InsetFacePlugin::OffsetLoop2D(const std::vector<Point2D>& loop_points, double signed_thickness, bool even_offset, std::vector<Point2D>& out_points, std::wstring& warning) const
 {
 	out_points.clear();
 	if (loop_points.size() < 3) return false;
@@ -1447,33 +1468,44 @@ bool InsetFacePlugin::OffsetLoop2D(const std::vector<Point2D>& loop_points, doub
 			Point2D dir1 = edge1 / edge1_len;
 			Point2D inward0 = Normalize2D(PerpLeft(dir0) * orientation);
 			Point2D inward1 = Normalize2D(PerpLeft(dir1) * orientation);
-
-			Point2D line0_point = curr + inward0 * distance;
-			Point2D line1_point = curr + inward1 * distance;
+			Point2D bisector = inward0 + inward1;
+			if (Length2D(bisector) <= kGeometryEpsilon) {
+				bisector = inward1;
+			}
+			bisector = Normalize2D(bisector);
 
 			Point2D intersection;
-			if (!IntersectInfiniteLines(line0_point, dir0, line1_point, dir1, intersection)) {
-				had_parallel_fallback = true;
-				Point2D bisector = inward0 + inward1;
-				if (Length2D(bisector) <= kGeometryEpsilon) {
-					bisector = inward1;
+			if (!even_offset) {
+				double bisector_alignment = Dot2D(bisector, inward1);
+				if (bisector_alignment <= kGeometryEpsilon) {
+					had_parallel_fallback = true;
+					intersection = curr + inward1 * distance;
 				}
-				bisector = Normalize2D(bisector);
-				double dot_value = Dot2D(bisector, inward1);
-				double miter_length = std::fabs(dot_value) > kGeometryEpsilon ? distance / dot_value : distance;
-				double max_length = std::fabs(distance) * kMaxMiterFactor;
-				if (std::fabs(miter_length) > max_length) {
-					miter_length = (miter_length < 0.0 ? -max_length : max_length);
+				else {
+					intersection = curr + bisector * distance;
 				}
-				intersection = curr + bisector * miter_length;
 			}
 			else {
-				Point2D delta = intersection - curr;
-				double max_length = std::fabs(distance) * kMaxMiterFactor;
-				if (max_length > 0.0 && Length2D(delta) > max_length) {
-					Point2D dir = Normalize2D(delta);
-					intersection = curr + dir * max_length;
-					AppendLocalizedWarning(warning, "WarnParallelEdgeFallback");
+				Point2D line0_point = curr + inward0 * distance;
+				Point2D line1_point = curr + inward1 * distance;
+				if (!IntersectInfiniteLines(line0_point, dir0, line1_point, dir1, intersection)) {
+					had_parallel_fallback = true;
+					double bisector_alignment = Dot2D(bisector, inward1);
+					double miter_length = std::fabs(bisector_alignment) > kGeometryEpsilon ? distance / bisector_alignment : distance;
+					double max_length = std::fabs(distance) * (kMaxMiterFactor * 1.5);
+					if (std::fabs(miter_length) > max_length) {
+						miter_length = (miter_length < 0.0 ? -max_length : max_length);
+					}
+					intersection = curr + bisector * miter_length;
+				}
+				else {
+					Point2D delta = intersection - curr;
+					double max_length = std::fabs(distance) * (kMaxMiterFactor * 1.5);
+					if (max_length > 0.0 && Length2D(delta) > max_length) {
+						Point2D dir = Normalize2D(delta);
+						intersection = curr + dir * max_length;
+						AppendLocalizedWarning(warning, "WarnParallelEdgeFallback");
+					}
 				}
 			}
 
@@ -1526,7 +1558,7 @@ bool InsetFacePlugin::SolveRegionInterior2D(TempRegion& region, double thickness
 		std::vector<Point2D> inset_points;
 		std::wstring loop_warning;
 		double signed_thickness = region.BoundaryLoops[li].IsHole ? -thickness : thickness;
-		if (!OffsetLoop2D(loop_points, signed_thickness, inset_points, loop_warning)) {
+		if (!OffsetLoop2D(loop_points, signed_thickness, true, inset_points, loop_warning)) {
 			AppendWarning(region.Warning, loop_warning);
 			return false;
 		}
@@ -1647,9 +1679,25 @@ bool InsetFacePlugin::BuildTempRegion(MQObject obj, int object_index, const std:
 			return false;
 		}
 	}
-	if (!SolvePatchInsetVertices(region, m_Params.Depth)) {
-		AppendLocalizedWarning(region.Warning, "WarnPatchSolveFailed");
-		return false;
+
+	if (m_Params.CurrentMode == InsetParameters::ModeRegion && m_Params.EvenOffset) {
+		if (!FitLocalPlane(region, faces)) {
+			return false;
+		}
+		ProjectRegionVertices(region);
+		if (!ExtractBoundaryLoops(region)) {
+			return false;
+		}
+		if (!SolveRegionInterior2D(region, m_Params.Thickness, m_Params.Depth)) {
+			AppendLocalizedWarning(region.Warning, "WarnPatchSolveFailed");
+			return false;
+		}
+	}
+	else {
+		if (!SolvePatchInsetVertices(region, m_Params.Depth)) {
+			AppendLocalizedWarning(region.Warning, "WarnPatchSolveFailed");
+			return false;
+		}
 	}
 
 	region.Valid = true;
@@ -2068,6 +2116,7 @@ void InsetFacePlugin::ResetAfterApply(MQDocument doc)
 	ClearDocumentSelection(doc);
 	m_Params.Thickness = 0.0;
 	m_Params.Depth = 0.0;
+	m_Params.EvenOffset = false;
 	ResetToolState(false);
 	if (m_Window) m_Window->SyncFromPlugin();
 	SetStatus();
