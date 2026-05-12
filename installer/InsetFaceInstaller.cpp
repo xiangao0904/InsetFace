@@ -272,7 +272,7 @@ static bool WriteBinaryFileAtomic(const std::wstring& path, const std::string& d
 		return false;
 	}
 
-	std::wstring temp_path = path + L".tmp." + std::to_wstring(GetCurrentProcessId()) + L"." + std::to_wstring(GetTickCount());
+	std::wstring temp_path = path + L".tmp." + std::to_wstring(GetCurrentProcessId()) + L"." + std::to_wstring(GetTickCount64());
 	HANDLE file = CreateFileW(temp_path.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (file == INVALID_HANDLE_VALUE) {
 		return false;
@@ -1317,6 +1317,10 @@ static void ChooseMetaseqExecutable(HWND owner)
 		return;
 	}
 
+	if (g_app == NULL || g_app->PathEdit == NULL) {
+		return;
+	}
+
 	std::wstring root = NormalizePath(file_buffer);
 	SetWindowTextW(g_app->PathEdit, root.c_str());
 	RefreshButtons();
@@ -1523,20 +1527,30 @@ static void InitializeVisuals()
 	if (g_app->MonoFont == NULL) g_app->MonoFont = g_app->UiFont;
 }
 
-static void CreateChildControls()
+static bool CreateChildControls()
 {
+	if (g_app == NULL) return false;
+
 	g_app->BrandIcon = CreateAppControl(WS_CHILD | WS_VISIBLE | SS_ICON, 0, L"STATIC", L"", 28, 26, 56, 56, IDC_BRAND_ICON);
-	SendMessageW(g_app->BrandIcon, STM_SETICON, reinterpret_cast<WPARAM>(g_app->AppIconLarge), 0);
+	if (g_app->BrandIcon != NULL) {
+		SendMessageW(g_app->BrandIcon, STM_SETICON, reinterpret_cast<WPARAM>(g_app->AppIconLarge), 0);
+	}
 
 	g_app->HeaderLabel = CreateAppControl(WS_CHILD | WS_VISIBLE, 0, L"STATIC", L"InsetFace setup", 102, 28, 420, 32, IDC_HEADER_TITLE);
-	SendMessageW(g_app->HeaderLabel, WM_SETFONT, reinterpret_cast<WPARAM>(g_app->HeaderFont), TRUE);
+	if (g_app->HeaderLabel != NULL) {
+		SendMessageW(g_app->HeaderLabel, WM_SETFONT, reinterpret_cast<WPARAM>(g_app->HeaderFont), TRUE);
+	}
 
 	g_app->HintLabel = CreateAppControl(WS_CHILD | WS_VISIBLE, 0, L"STATIC", L"Auto-detect a Metasequoia install, or point the installer at Metaseq.exe manually.", 102, 64, 590, 24, IDC_HEADER_HINT);
-	SendMessageW(g_app->HintLabel, WM_SETFONT, reinterpret_cast<WPARAM>(g_app->HintFont), TRUE);
+	if (g_app->HintLabel != NULL) {
+		SendMessageW(g_app->HintLabel, WM_SETFONT, reinterpret_cast<WPARAM>(g_app->HintFont), TRUE);
+	}
 
 	CreateAppControl(WS_CHILD | WS_VISIBLE, 0, L"STATIC", L"Metasequoia root", 36, 132, 180, 20, 0);
 	g_app->PathEdit = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 0, L"EDIT", L"", 36, 160, 472, 34, IDC_ROOT_PATH);
-	SendMessageW(g_app->PathEdit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(8, 8));
+	if (g_app->PathEdit != NULL) {
+		SendMessageW(g_app->PathEdit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(8, 8));
+	}
 	g_app->BrowseButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, L"BUTTON", L"Browse...", 520, 160, 116, 34, IDC_BROWSE);
 
 	g_app->InstallButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, L"BUTTON", L"Install / Update", 36, 244, 184, 40, IDC_INSTALL);
@@ -1554,8 +1568,15 @@ static void CreateChildControls()
 		604,
 		180,
 		IDC_STATUS);
-	SendMessageW(g_app->StatusEdit, WM_SETFONT, reinterpret_cast<WPARAM>(g_app->MonoFont), TRUE);
-	SendMessageW(g_app->StatusEdit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(10, 10));
+	if (g_app->StatusEdit != NULL) {
+		SendMessageW(g_app->StatusEdit, WM_SETFONT, reinterpret_cast<WPARAM>(g_app->MonoFont), TRUE);
+		SendMessageW(g_app->StatusEdit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(10, 10));
+	}
+
+	return g_app->PathEdit != NULL &&
+		g_app->BrowseButton != NULL &&
+		g_app->InstallButton != NULL &&
+		g_app->StatusEdit != NULL;
 }
 
 static LRESULT CALLBACK MainWindowProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam)
@@ -1645,7 +1666,7 @@ static LRESULT CALLBACK MainWindowProc(HWND window, UINT message, WPARAM wparam,
 
 }  // namespace
 
-int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int show_command)
+int WINAPI wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE, _In_ PWSTR, _In_ int show_command)
 {
 	INITCOMMONCONTROLSEX common_controls = {};
 	common_controls.dwSize = sizeof(common_controls);
@@ -1689,10 +1710,12 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int show_command)
 		return 1;
 	}
 
-	CreateChildControls();
+	if (!CreateChildControls()) {
+		return 1;
+	}
 
 	std::wstring detected_root = AutoDetectMetasequoiaRoot();
-	if (!detected_root.empty()) {
+	if (app.PathEdit != NULL && !detected_root.empty()) {
 		SetWindowTextW(app.PathEdit, detected_root.c_str());
 		AppendStatus(L"Auto-detected the Metasequoia install folder.");
 	}

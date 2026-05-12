@@ -275,6 +275,11 @@ struct SelectedFaceRef
 	SelectedFaceRef() : ObjectIndex(-1), FaceUniqueID(0) {}
 	SelectedFaceRef(int object_index, UINT face_unique_id) : ObjectIndex(object_index), FaceUniqueID(face_unique_id) {}
 
+	bool operator==(const SelectedFaceRef& rhs) const
+	{
+		return ObjectIndex == rhs.ObjectIndex && FaceUniqueID == rhs.FaceUniqueID;
+	}
+
 	bool operator<(const SelectedFaceRef& rhs) const
 	{
 		if (ObjectIndex != rhs.ObjectIndex) return ObjectIndex < rhs.ObjectIndex;
@@ -488,6 +493,7 @@ public:
 	BOOL Activate(MQDocument doc, BOOL flag) override;
 	void OnDraw(MQDocument doc, MQScene scene, int width, int height) override;
 	void OnObjectSelected(MQDocument doc) override;
+	void OnUpdateScene(MQDocument doc, MQScene scene) override;
 	BOOL OnLeftButtonDown(MQDocument doc, MQScene scene, MOUSE_BUTTON_STATE& state) override;
 	BOOL OnLeftButtonMove(MQDocument doc, MQScene scene, MOUSE_BUTTON_STATE& state) override;
 	BOOL OnLeftButtonUp(MQDocument doc, MQScene scene, MOUSE_BUTTON_STATE& state) override;
@@ -503,7 +509,6 @@ private:
 		bool Pending;
 		bool Active;
 		bool Moved;
-		bool HitWasSelected;
 		bool PreserveSelectionForDrag;
 		BOOL ShiftAtMouseDown;
 		int HitObjectIndex;
@@ -515,7 +520,6 @@ private:
 			: Pending(false)
 			, Active(false)
 			, Moved(false)
-			, HitWasSelected(false)
 			, PreserveSelectionForDrag(false)
 			, ShiftAtMouseDown(FALSE)
 			, HitObjectIndex(-1)
@@ -547,6 +551,7 @@ private:
 	void SetStatus();
 	void CancelCurrentOperation();
 	void SyncSelectionFromDocument(MQDocument doc);
+	bool RefreshSelectionFromDocument(MQDocument doc);
 	void ClearDocumentSelection(MQDocument doc);
 	void SyncDocumentSelection(MQDocument doc, int preferred_object_index = -1);
 	bool IsFaceSelected(int object_index, UINT face_unique_id) const;
@@ -827,6 +832,15 @@ void InsetFacePlugin::OnObjectSelected(MQDocument doc)
 	RedrawAllScene();
 }
 
+void InsetFacePlugin::OnUpdateScene(MQDocument doc, MQScene scene)
+{
+	if (!m_Activated) return;
+	if (m_Drag.Active || m_Drag.Pending) return;
+	if (RefreshSelectionFromDocument(doc)) {
+		RedrawScene(scene);
+	}
+}
+
 void InsetFacePlugin::ResetToolState(bool clear_selection)
 {
 	m_Drag = DragState();
@@ -886,7 +900,14 @@ void InsetFacePlugin::CancelCurrentOperation()
 
 void InsetFacePlugin::SyncSelectionFromDocument(MQDocument doc)
 {
-	m_SelectedFaces.clear();
+	if (!RefreshSelectionFromDocument(doc)) {
+		SetStatus();
+	}
+}
+
+bool InsetFacePlugin::RefreshSelectionFromDocument(MQDocument doc)
+{
+	std::set<SelectedFaceRef> new_selection;
 	int object_count = doc->GetObjectCount();
 	for (int oi = 0; oi < object_count; ++oi) {
 		MQObject obj = doc->GetObject(oi);
@@ -894,12 +915,19 @@ void InsetFacePlugin::SyncSelectionFromDocument(MQDocument doc)
 		int face_count = obj->GetFaceCount();
 		for (int fi = 0; fi < face_count; ++fi) {
 			if (obj->GetFacePointCount(fi) >= 3 && doc->IsSelectFace(oi, fi)) {
-				m_SelectedFaces.insert(SelectedFaceRef(oi, obj->GetFaceUniqueID(fi)));
+				new_selection.insert(SelectedFaceRef(oi, obj->GetFaceUniqueID(fi)));
 			}
 		}
 	}
+
+	if (new_selection == m_SelectedFaces) {
+		return false;
+	}
+
+	m_SelectedFaces.swap(new_selection);
 	InvalidatePreview();
 	SetStatus();
+	return true;
 }
 
 void InsetFacePlugin::ClearDocumentSelection(MQDocument doc)
@@ -2012,8 +2040,7 @@ void InsetFacePlugin::OnDraw(MQDocument doc, MQScene scene, int width, int heigh
 
 	if (m_HoverFaceValid &&
 		!m_Drag.Pending &&
-		!m_Drag.Active &&
-		!IsFaceSelected(m_HoverObjectIndex, m_HoverFaceUniqueID)) {
+		!m_Drag.Active) {
 		MQObject obj = doc->GetObject(m_HoverObjectIndex);
 		if (obj != NULL) {
 			int face_index = obj->GetFaceIndexFromUniqueID(m_HoverFaceUniqueID);
@@ -2086,8 +2113,7 @@ BOOL InsetFacePlugin::OnLeftButtonDown(MQDocument doc, MQScene scene, MOUSE_BUTT
 		if (obj != NULL) {
 			UINT face_unique_id = obj->GetFaceUniqueID(hit_param.FaceIndex);
 			m_Drag.Pending = true;
-			m_Drag.HitWasSelected = IsFaceSelected(hit_param.ObjectIndex, face_unique_id);
-			m_Drag.PreserveSelectionForDrag = (m_Drag.HitWasSelected && state.Shift) ? true : false;
+			m_Drag.PreserveSelectionForDrag = IsFaceSelected(hit_param.ObjectIndex, face_unique_id) ? true : false;
 			m_Drag.ShiftAtMouseDown = state.Shift;
 			m_Drag.HitObjectIndex = hit_param.ObjectIndex;
 			m_Drag.HitFaceUniqueID = face_unique_id;
@@ -2162,6 +2188,7 @@ BOOL InsetFacePlugin::OnLeftButtonUp(MQDocument doc, MQScene scene, MOUSE_BUTTON
 		m_Drag.Active = false;
 		m_Drag.Pending = false;
 		bool applied = ApplyPreview(doc);
+		m_Drag = DragState();
 		if (!applied) {
 			InvalidatePreview();
 			RedrawAllScene();
@@ -2188,6 +2215,8 @@ BOOL InsetFacePlugin::OnMouseMove(MQDocument doc, MQScene scene, MOUSE_BUTTON_ST
 		return FALSE;
 	}
 
+	bool redraw = RefreshSelectionFromDocument(doc);
+
 	HIT_TEST_PARAM hit_param;
 	hit_param.TestVertex = FALSE;
 	hit_param.TestLine = FALSE;
@@ -2208,7 +2237,6 @@ BOOL InsetFacePlugin::OnMouseMove(MQDocument doc, MQScene scene, MOUSE_BUTTON_ST
 		}
 	}
 
-	bool redraw = false;
 	if (new_hover_valid != m_HoverFaceValid || new_hover_object != m_HoverObjectIndex || new_hover_face != m_HoverFaceUniqueID) {
 		m_HoverFaceValid = new_hover_valid;
 		m_HoverObjectIndex = new_hover_object;
