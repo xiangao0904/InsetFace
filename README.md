@@ -61,8 +61,8 @@
 
 - `InsetFace.dll`
 - `InsetFace.resource.xml`
-- `cmd_insetface.svg` 白色版
-- `cmd_insetface.svg` 黑色版
+- `cmd_insetface.svg` 白色icon
+- `cmd_insetface.svg` 黑色icon
 
 ## 使用说明
 
