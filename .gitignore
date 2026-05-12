@@ -4,6 +4,8 @@
 *.VC.db
 *.VC.opendb
 
+.VSCodeCounter
+
 build/
 x64/
 Debug/

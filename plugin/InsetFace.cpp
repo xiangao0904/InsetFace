@@ -336,9 +336,17 @@ struct TempVertex
 	MQPoint AverageNormal;
 	Point2D OriginalProjected;
 	Point2D NewProjected;
+	MQPoint SolvedTangentOffset;
+	MQPoint BoundaryTargetPosition;
 	bool Boundary;
 
-	TempVertex() : OriginalVertexIndex(-1), Boundary(false) {}
+	TempVertex()
+		: OriginalVertexIndex(-1)
+		, SolvedTangentOffset(0, 0, 0)
+		, BoundaryTargetPosition(0, 0, 0)
+		, Boundary(false)
+	{
+	}
 };
 
 struct TempHalfEdge
@@ -559,10 +567,15 @@ private:
 	bool BuildFaceLocalInset(TempRegion& region, TempFace& face);
 	bool SolvePatchInsetVertices(TempRegion& region, double depth);
 	bool FitLocalPlane(TempRegion& region, const std::vector<FaceInfo>& faces);
+	bool IsRegionNearlyPlanar(const TempRegion& region, const std::vector<FaceInfo>& faces, double thickness) const;
 	void ProjectRegionVertices(TempRegion& region);
 	bool ExtractBoundaryLoops(TempRegion& region);
 	bool OffsetLoop2D(const std::vector<Point2D>& loop_points, double signed_thickness, bool even_offset, std::vector<Point2D>& out_points, std::wstring& warning) const;
 	bool SolveRegionInterior2D(TempRegion& region, double thickness, double depth);
+	bool BuildSurfaceAwareBoundaryTargets(TempRegion& region);
+	bool SolveRegionInterior3D(TempRegion& region, double depth);
+	bool SolveRegionEvenOffsetPlanar(TempRegion& region, double thickness, double depth);
+	bool SolveRegionEvenOffsetSurfaceAware(TempRegion& region, double depth);
 	MQPoint LiftPoint(const TempRegion& region, const Point2D& point) const;
 
 	bool ApplyPreview(MQDocument doc);
@@ -1341,6 +1354,31 @@ bool InsetFacePlugin::FitLocalPlane(TempRegion& region, const std::vector<FaceIn
 	return true;
 }
 
+bool InsetFacePlugin::IsRegionNearlyPlanar(const TempRegion& region, const std::vector<FaceInfo>& faces, double thickness) const
+{
+	const double effective_thickness = std::max(std::fabs(thickness), 1e-4);
+	double max_vertex_plane_distance = 0.0;
+	for (size_t i = 0; i < region.Vertices.size(); ++i) {
+		const MQPoint delta = region.Vertices[i].OriginalPosition - region.PlaneOrigin;
+		max_vertex_plane_distance = std::max(max_vertex_plane_distance, std::fabs((double)GetInnerProduct(delta, region.PlaneNormal)));
+	}
+
+	double max_face_normal_deviation_deg = 0.0;
+	for (size_t fi = 0; fi < faces.size(); ++fi) {
+		MQPoint face_normal = faces[fi].FaceNormal;
+		if (GetInnerProduct(face_normal, face_normal) <= 1e-12f) {
+			continue;
+		}
+		face_normal = Normalize(face_normal);
+		double dot = std::max(-1.0, std::min(1.0, (double)GetInnerProduct(face_normal, region.PlaneNormal)));
+		double angle_deg = std::acos(dot) * 180.0 / 3.14159265358979323846;
+		max_face_normal_deviation_deg = std::max(max_face_normal_deviation_deg, angle_deg);
+	}
+
+	return max_vertex_plane_distance <= 0.25 * effective_thickness
+		&& max_face_normal_deviation_deg <= 8.0;
+}
+
 void InsetFacePlugin::ProjectRegionVertices(TempRegion& region)
 {
 	for (size_t i = 0; i < region.Vertices.size(); ++i) {
@@ -1594,6 +1632,154 @@ bool InsetFacePlugin::SolveRegionInterior2D(TempRegion& region, double thickness
 	return true;
 }
 
+bool InsetFacePlugin::BuildSurfaceAwareBoundaryTargets(TempRegion& region)
+{
+	std::vector<MQPoint> tangent_sum(region.Vertices.size(), MQPoint(0, 0, 0));
+	std::vector<double> weight_sum(region.Vertices.size(), 0.0);
+
+	for (size_t fi = 0; fi < region.Faces.size(); ++fi) {
+		TempFace& face = region.Faces[fi];
+		if (face.LocalInsetPoints.size() != face.Vertices.size()) {
+			return false;
+		}
+
+		std::vector<MQPoint> polygon(face.Vertices.size());
+		for (size_t vi = 0; vi < face.Vertices.size(); ++vi) {
+			polygon[vi] = region.Vertices[face.Vertices[vi]].OriginalPosition;
+		}
+
+		for (size_t vi = 0; vi < face.Vertices.size(); ++vi) {
+			const int temp_vertex_index = face.Vertices[vi];
+			TempVertex& vertex = region.Vertices[temp_vertex_index];
+			if (!vertex.Boundary) {
+				continue;
+			}
+
+			MQPoint average_normal = vertex.AverageNormal;
+			if (GetInnerProduct(average_normal, average_normal) <= 1e-12f) {
+				average_normal = face.FaceNormal;
+			}
+			if (GetInnerProduct(average_normal, average_normal) <= 1e-12f) {
+				average_normal = MQPoint(0, 0, 1);
+			}
+			average_normal = Normalize(average_normal);
+
+			MQPoint local_offset = face.LocalInsetPoints[vi] - vertex.OriginalPosition;
+			MQPoint tangent_offset = ProjectVectorToPlane(local_offset, average_normal);
+			double weight = ComputeFaceCornerWeight(polygon, vi, face.FaceNormal);
+			tangent_sum[temp_vertex_index] += tangent_offset * (float)weight;
+			weight_sum[temp_vertex_index] += weight;
+		}
+	}
+
+	for (size_t vi = 0; vi < region.Vertices.size(); ++vi) {
+		TempVertex& vertex = region.Vertices[vi];
+		vertex.BoundaryTargetPosition = vertex.OriginalPosition;
+		if (!vertex.Boundary) {
+			continue;
+		}
+		if (weight_sum[vi] <= kGeometryEpsilon) {
+			return false;
+		}
+		MQPoint average_normal = vertex.AverageNormal;
+		if (GetInnerProduct(average_normal, average_normal) <= 1e-12f) {
+			average_normal = MQPoint(0, 0, 1);
+		}
+		average_normal = Normalize(average_normal);
+		MQPoint tangent_offset = tangent_sum[vi] / (float)weight_sum[vi];
+		tangent_offset = ProjectVectorToPlane(tangent_offset, average_normal);
+		vertex.BoundaryTargetPosition = vertex.OriginalPosition + tangent_offset;
+	}
+
+	return true;
+}
+
+bool InsetFacePlugin::SolveRegionInterior3D(TempRegion& region, double depth)
+{
+	std::vector<bool> fixed(region.Vertices.size(), false);
+	std::vector<std::vector<int> > adjacency(region.Vertices.size());
+
+	for (size_t hi = 0; hi < region.HalfEdges.size(); ++hi) {
+		const TempHalfEdge& halfedge = region.HalfEdges[hi];
+		adjacency[halfedge.StartVertex].push_back(halfedge.EndVertex);
+		adjacency[halfedge.EndVertex].push_back(halfedge.StartVertex);
+	}
+
+	if (!SolvePatchInsetVertices(region, 0.0)) {
+		return false;
+	}
+
+	for (size_t vi = 0; vi < region.Vertices.size(); ++vi) {
+		TempVertex& vertex = region.Vertices[vi];
+		MQPoint average_normal = vertex.AverageNormal;
+		if (GetInnerProduct(average_normal, average_normal) <= 1e-12f) {
+			average_normal = MQPoint(0, 0, 1);
+		}
+		average_normal = Normalize(average_normal);
+
+		MQPoint tangent_offset = ProjectVectorToPlane(vertex.NewPosition - vertex.OriginalPosition, average_normal);
+		vertex.SolvedTangentOffset = tangent_offset;
+		if (vertex.Boundary) {
+			vertex.SolvedTangentOffset = ProjectVectorToPlane(vertex.BoundaryTargetPosition - vertex.OriginalPosition, average_normal);
+			fixed[vi] = true;
+		}
+	}
+
+	for (int iteration = 0; iteration < kInteriorSolveIterations; ++iteration) {
+		for (size_t vi = 0; vi < region.Vertices.size(); ++vi) {
+			if (fixed[vi] || adjacency[vi].empty()) continue;
+
+			MQPoint sum(0, 0, 0);
+			int count = 0;
+			for (size_t ni = 0; ni < adjacency[vi].size(); ++ni) {
+				sum += region.Vertices[adjacency[vi][ni]].SolvedTangentOffset;
+				++count;
+			}
+			if (count <= 0) {
+				continue;
+			}
+
+			MQPoint average_normal = region.Vertices[vi].AverageNormal;
+			if (GetInnerProduct(average_normal, average_normal) <= 1e-12f) {
+				average_normal = MQPoint(0, 0, 1);
+			}
+			average_normal = Normalize(average_normal);
+
+			MQPoint averaged = sum / (float)count;
+			region.Vertices[vi].SolvedTangentOffset = ProjectVectorToPlane(averaged, average_normal);
+		}
+	}
+
+	for (size_t vi = 0; vi < region.Vertices.size(); ++vi) {
+		TempVertex& vertex = region.Vertices[vi];
+		MQPoint average_normal = vertex.AverageNormal;
+		if (GetInnerProduct(average_normal, average_normal) <= 1e-12f) {
+			average_normal = MQPoint(0, 0, 1);
+		}
+		average_normal = Normalize(average_normal);
+		vertex.NewPosition = vertex.OriginalPosition + vertex.SolvedTangentOffset + average_normal * (float)depth;
+	}
+
+	return true;
+}
+
+bool InsetFacePlugin::SolveRegionEvenOffsetPlanar(TempRegion& region, double thickness, double depth)
+{
+	ProjectRegionVertices(region);
+	if (!ExtractBoundaryLoops(region)) {
+		return false;
+	}
+	return SolveRegionInterior2D(region, thickness, depth);
+}
+
+bool InsetFacePlugin::SolveRegionEvenOffsetSurfaceAware(TempRegion& region, double depth)
+{
+	if (!BuildSurfaceAwareBoundaryTargets(region)) {
+		return false;
+	}
+	return SolveRegionInterior3D(region, depth);
+}
+
 bool InsetFacePlugin::BuildTempRegion(MQObject obj, int object_index, const std::vector<FaceInfo>& faces, TempRegion& region)
 {
 	region = TempRegion();
@@ -1684,11 +1870,19 @@ bool InsetFacePlugin::BuildTempRegion(MQObject obj, int object_index, const std:
 		if (!FitLocalPlane(region, faces)) {
 			return false;
 		}
-		ProjectRegionVertices(region);
-		if (!ExtractBoundaryLoops(region)) {
-			return false;
+		const bool nearly_planar = IsRegionNearlyPlanar(region, faces, m_Params.Thickness);
+		bool solved = false;
+		if (nearly_planar) {
+			solved = SolveRegionEvenOffsetPlanar(region, m_Params.Thickness, m_Params.Depth);
 		}
-		if (!SolveRegionInterior2D(region, m_Params.Thickness, m_Params.Depth)) {
+		else {
+			solved = SolveRegionEvenOffsetSurfaceAware(region, m_Params.Depth);
+			if (!solved) {
+				AppendLocalizedWarning(region.Warning, "WarnSurfaceAwareFallback");
+				solved = SolvePatchInsetVertices(region, m_Params.Depth);
+			}
+		}
+		if (!solved) {
 			AppendLocalizedWarning(region.Warning, "WarnPatchSolveFailed");
 			return false;
 		}

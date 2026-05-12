@@ -27,6 +27,7 @@
     <string id="WarnCollapsed">オフセットが潰れました</string>
     <string id="WarnFaceInsetFailed">面ごとのインセットに失敗しました</string>
     <string id="WarnPatchSolveFailed">リージョンの解決に失敗しました</string>
+    <string id="WarnSurfaceAwareFallback">曲面対応オフセットに失敗したため通常リージョン解へフォールバックしました</string>
   </resource>
   <resource language="Chinese">
     <string id="Title">面内插</string>
@@ -55,6 +56,7 @@
     <string id="WarnCollapsed">偏移塌缩</string>
     <string id="WarnFaceInsetFailed">单面内插失败</string>
     <string id="WarnPatchSolveFailed">区域求解失败</string>
+    <string id="WarnSurfaceAwareFallback">曲面感知均等偏移失败，已回退到普通区域求解</string>
   </resource>
   <resource language="English" default="1">
     <string id="Title">Inset Face</string>
@@ -83,5 +85,6 @@
     <string id="WarnCollapsed">collapsed</string>
     <string id="WarnFaceInsetFailed">face inset failed</string>
     <string id="WarnPatchSolveFailed">patch solve failed</string>
+    <string id="WarnSurfaceAwareFallback">surface-aware even offset failed, fell back to patch solve</string>
   </resource>
 </resources>
