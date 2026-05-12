@@ -1445,20 +1445,16 @@ static void PaintInstallerWindow(HWND window)
 	const int content_width = (client.right - client.left) - margin * 2;
 	RECT hero_card = MakeRect(margin, 18, content_width, 92);
 	RECT path_card = MakeRect(margin, 120, content_width, 86);
-	RECT action_card = MakeRect(margin, 222, content_width, 62);
-	RECT log_card = MakeRect(margin, 294, content_width, (client.bottom - 314) > 120 ? (client.bottom - 314) : 120);
+	RECT action_card = MakeRect(margin, 232, content_width, 62);
+	RECT log_card = MakeRect(margin, 304, content_width, (client.bottom - 324) > 120 ? (client.bottom - 324) : 120);
 
 	DrawInstallerCard(hdc, hero_card);
 	DrawInstallerCard(hdc, path_card);
 	DrawInstallerCard(hdc, action_card);
 	DrawInstallerCard(hdc, log_card);
 
-	RECT hero_accent = hero_card;
-	hero_accent.bottom = hero_accent.top + 8;
-	FillRoundedRect(hdc, hero_accent, RGB(37, 99, 235), RGB(37, 99, 235), 14);
-
-	RECT path_shell = MakeRect(30, 150, content_width - 40, 50);
-	RECT log_shell = MakeRect(30, 336, content_width - 40, log_card.bottom - 336 - 10);
+	RECT path_shell = MakeRect(30, 150, 490, 50);
+	RECT log_shell = MakeRect(30, 346, content_width - 40, log_card.bottom - 346 - 10);
 	FillRoundedRect(hdc, path_shell, RGB(248, 250, 252), RGB(214, 223, 233), 16);
 	FillRoundedRect(hdc, log_shell, RGB(248, 250, 252), RGB(214, 223, 233), 16);
 
@@ -1539,24 +1535,24 @@ static void CreateChildControls()
 	SendMessageW(g_app->HintLabel, WM_SETFONT, reinterpret_cast<WPARAM>(g_app->HintFont), TRUE);
 
 	CreateAppControl(WS_CHILD | WS_VISIBLE, 0, L"STATIC", L"Metasequoia root", 36, 132, 180, 20, 0);
-	g_app->PathEdit = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 0, L"EDIT", L"", 36, 160, 520, 34, IDC_ROOT_PATH);
+	g_app->PathEdit = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 0, L"EDIT", L"", 36, 160, 472, 34, IDC_ROOT_PATH);
 	SendMessageW(g_app->PathEdit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(8, 8));
-	g_app->BrowseButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, L"BUTTON", L"Browse...", 572, 162, 120, 34, IDC_BROWSE);
+	g_app->BrowseButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, L"BUTTON", L"Browse...", 520, 160, 116, 34, IDC_BROWSE);
 
-	g_app->InstallButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, L"BUTTON", L"Install / Update", 36, 226, 184, 40, IDC_INSTALL);
-	g_app->RepairButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, L"BUTTON", L"Repair", 232, 226, 128, 40, IDC_REPAIR);
-	g_app->UninstallButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, L"BUTTON", L"Uninstall", 372, 226, 128, 40, IDC_UNINSTALL);
+	g_app->InstallButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, L"BUTTON", L"Install / Update", 36, 244, 184, 40, IDC_INSTALL);
+	g_app->RepairButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, L"BUTTON", L"Repair", 232, 244, 128, 40, IDC_REPAIR);
+	g_app->UninstallButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, L"BUTTON", L"Uninstall", 372, 244, 128, 40, IDC_UNINSTALL);
 
-	g_app->StatusLabel = CreateAppControl(WS_CHILD | WS_VISIBLE, 0, L"STATIC", L"Activity log", 36, 314, 160, 20, IDC_SECTION_STATUS);
+	g_app->StatusLabel = CreateAppControl(WS_CHILD | WS_VISIBLE, 0, L"STATIC", L"Activity log", 36, 324, 160, 20, IDC_SECTION_STATUS);
 	g_app->StatusEdit = CreateAppControl(
 		WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_VSCROLL,
 		0,
 		L"EDIT",
 		L"",
 		36,
-		342,
-		656,
-		210,
+		352,
+		604,
+		180,
 		IDC_STATUS);
 	SendMessageW(g_app->StatusEdit, WM_SETFONT, reinterpret_cast<WPARAM>(g_app->MonoFont), TRUE);
 	SendMessageW(g_app->StatusEdit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(10, 10));
