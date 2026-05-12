@@ -1,93 +1,97 @@
 # InsetFace
+<img height="60px" src="https://github.com/xiangao0904/InsetFace/blob/master/plugin/icon_white.svg" /> <img height="60px" src="https://github.com/xiangao0904/InsetFace/blob/master/plugin/icon_black.svg" />
 
-`InsetFace` 是一个面向 Metasequoia 4 的独立插件，提供交互式面内插功能，并附带一个可视化安装器。
+`InsetFace` is an independent plugin for **Metasequoia 4** that provides interactive face insetting functionality, complete with a visual installer.
 
+---
 
-## 功能概览
+## ✨ Features
 
-- 支持 `Region` 和 `Individual` 两种 inset 模式
-- 支持 `Thickness` 和 `Depth` 两个主要几何参数
-- 支持 `Offset Even`（均等偏移）开关
-- 支持中文、日文、英文三种界面文本
-- 提供独立 Windows 安装器
-- 支持预览、拖拽调节、应用、取消和撤销
+- **Inset Modes:** Supports both `Region` (inset as a group) and `Individual` (inset each face separately).
+- **Geometric Control:** Adjust `Thickness` (inset width) and `Depth` (height/extrusion along normals).
+- **Offset Even:** Toggle to maintain uniform margins on irregular polygons.
+- **Multilingual UI:** Supports Chinese, Japanese, and English.
+- **Windows Installer:** Includes a dedicated installer for easy setup.
+- **Interactive Workflow:** Supports real-time preview, drag-to-adjust in the viewport, apply, cancel, and undo.
 
-## 仓库结构
+---
 
-- `plugin/`
-  插件本体源码、资源和多语言文件
-- `installer/`
-  Windows 安装器源码和资源
-- `vendor/mqsdk/`
-  从官方 SDK 提取出的最小依赖
-- `InsetFace.sln`
-  Visual Studio 解决方案
-- `InsetFace.vcxproj`
-  插件工程
-- `InsetFaceInstaller.vcxproj`
-  安装器工程
+## 📂 Repository Structure
 
-## 构建环境
+- `plugin/`  
+  Plugin source code, resources, and localization files.
+- `installer/`  
+  Source code and assets for the Windows installer.
+- `vendor/mqsdk/`  
+  Minimal dependencies extracted from the official Metasequoia SDK.
+- `InsetFace.sln`  
+  Visual Studio solution file.
+- `InsetFace.vcxproj`  
+  Plugin project file.
+- `InsetFaceInstaller.vcxproj`  
+  Installer project file.
 
-- Visual Studio 2022
-- 平台：`x64`
-- Windows SDK：与当前 VS 安装匹配的版本
+---
 
-## 构建方法
+## 🛠️ Build Environment
 
-在 Visual Studio 中打开 `InsetFace.sln` 选择 `x64` 和 `Debug` 或 `Release` 后直接构建。
+- **IDE:** Visual Studio 2022  
+- **Platform:** `x64`  
+- **Windows SDK:** Version matching your current VS installation.
 
-默认主要产物：
+### How to Build
+1. Open `InsetFace.sln` in Visual Studio.
+2. Select `x64` and either `Debug` or `Release` configuration.
+3. Build the solution.
 
-- 插件：`build/x64/<Config>/InsetFace.dll`
-- 语言资源：`build/x64/<Config>/InsetFace.resource.xml`
-- 安装器：`build/x64/<Config>/InsetFaceInstaller.exe`
+**Main Output Files:**
+- **Plugin:** `build/x64/<Config>/InsetFace.dll`
+- **Resources:** `build/x64/<Config>/InsetFace.resource.xml`
+- **Installer:** `build/x64/<Config>/InsetFaceInstaller.exe`
 
-## 安装方式
+---
 
-推荐方式是直接运行安装器：
+## 🚀 Installation
 
-- [InsetFaceInstaller.exe](D:\myfiles\coding\cpp\mqsdk485\mqsdk\InsetFaceRepo\build\x64\Release\InsetFaceInstaller.exe)
+### Recommended Method
+Run the visual installer directly:
+- **[InsetFaceInstaller.exe](path/to/your/release/InsetFaceInstaller.exe)**
 
-安装器会负责：
+The installer will automatically:
+1. Copy `InsetFace.dll` and `InsetFace.resource.xml`.
+2. Deploy light/dark theme icons.
+3. **Modify Metasequoia layout files** to integrate the plugin.
+4. Create an installation manifest for easy repair or uninstallation.
 
-- 复制 `InsetFace.dll`
-- 部署 `InsetFace.resource.xml`
-- 部署白/黑主题图标
-- 修改 Metasequoia 布局文件
-- 写入安装 manifest，供修复和卸载使用
-
-如果你只是调试插件本体，也可以手动把以下文件复制到 Metasequoia 插件目录：
-
+### Manual Method (For Debugging)
+If you prefer manual deployment, copy the following files to your Metasequoia plugin directory:
 - `InsetFace.dll`
 - `InsetFace.resource.xml`
-- `cmd_insetface.svg` 白色icon
-- `cmd_insetface.svg` 黑色icon
+- `cmd_insetface.svg` (White/Black icons)
 
-## 使用说明
+---
 
-1. 在 Metasequoia 中启动 `InsetFace`
-2. 选择一个或多个面
-3. 选择模式：
-   `Region`：把连通面片作为一个整体处理
-   `Individual`：每个面单独 inset
-4. 调整参数：
-   `Thickness`：控制内插厚度
-   `Depth`：控制法线方向上的抬升或压入
-   `Offset Even`：开启后优先按真实边距解释厚度
-5. 预览结果
-6. 点击 `Apply` 提交，或点击 `Cancel` 取消
+## 💡 Usage
 
-也支持直接在视图中拖拽，快速调整 `Thickness`。
+1. Launch `InsetFace` from the Metasequoia tool panel.
+2. Select one or more faces.
+3. **Choose Mode:**
+   - `Region`: Treats connected faces as a single unit.
+   - `Individual`: Insets each face independently.
+4. **Adjust Parameters:**
+   - `Thickness`: Controls the inset margin.
+   - `Depth`: Controls the elevation or indentation along the normal.
+   - `Offset Even`: When enabled, prioritizes uniform edge distance.
+5. **Preview & Interaction:** View results in real-time. You can also **drag directly in the viewport** to quickly adjust `Thickness`.
+6. **Submit:** Click `Apply` to commit changes or `Cancel` to exit.
 
-## 多语言
+---
 
-插件文本由 `InsetFace.resource.xml` 提供，当前支持：
+## 🌍 Localization
 
-- Japanese
-- English
-- Chinese
+Plugin text is managed via `InsetFace.resource.xml`. Currently supported languages:
+- **English**
+- **Japanese** (日本語)
+- **Chinese** (简体中文)
 
-语言选择会读取 Metasequoia 当前语言设置
-
-
+The plugin automatically detects and matches the language settings of your Metasequoia installation.
