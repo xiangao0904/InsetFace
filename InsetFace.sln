@@ -4,6 +4,8 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "InsetFace", "InsetFace.vcxproj", "{6F4B9D1C-B6A6-4C26-BB7F-3D6E5C1F9B91}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "InsetFaceInstaller", "InsetFaceInstaller.vcxproj", "{E1CE4EE8-881E-48D4-B63F-34B544365A1A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -20,6 +22,14 @@ Global
 		{6F4B9D1C-B6A6-4C26-BB7F-3D6E5C1F9B91}.Release|Win32.Build.0 = Release|Win32
 		{6F4B9D1C-B6A6-4C26-BB7F-3D6E5C1F9B91}.Release|x64.ActiveCfg = Release|x64
 		{6F4B9D1C-B6A6-4C26-BB7F-3D6E5C1F9B91}.Release|x64.Build.0 = Release|x64
+		{E1CE4EE8-881E-48D4-B63F-34B544365A1A}.Debug|Win32.ActiveCfg = Debug|Win32
+		{E1CE4EE8-881E-48D4-B63F-34B544365A1A}.Debug|Win32.Build.0 = Debug|Win32
+		{E1CE4EE8-881E-48D4-B63F-34B544365A1A}.Debug|x64.ActiveCfg = Debug|x64
+		{E1CE4EE8-881E-48D4-B63F-34B544365A1A}.Debug|x64.Build.0 = Debug|x64
+		{E1CE4EE8-881E-48D4-B63F-34B544365A1A}.Release|Win32.ActiveCfg = Release|Win32
+		{E1CE4EE8-881E-48D4-B63F-34B544365A1A}.Release|Win32.Build.0 = Release|Win32
+		{E1CE4EE8-881E-48D4-B63F-34B544365A1A}.Release|x64.ActiveCfg = Release|x64
+		{E1CE4EE8-881E-48D4-B63F-34B544365A1A}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
