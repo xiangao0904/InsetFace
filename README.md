@@ -1,6 +1,6 @@
 # InsetFace
 
-`InsetFace` 是一个面向 Metasequoia 4 的独立插件仓库，提供交互式面内插功能，并附带一个可视化安装器。
+`InsetFace` 是一个面向 Metasequoia 4 的独立插件，提供交互式面内插功能，并附带一个可视化安装器。
 
 
 ## 功能概览
