@@ -22,9 +22,11 @@ LANGUAGE LANG_JAPANESE, SUBLANG_DEFAULT
 #endif //_WIN32
 
 /////////////////////////////////////////////////////////////////////////////
+IDI_APP_ICON            ICON                    "InsetFaceInstaller.ico"
 IDR_PAYLOAD_DLL        RCDATA                  "payload\\InsetFace.dll"
 IDR_PAYLOAD_ICON_WHITE RCDATA                  "..\\plugin\\icon_white.svg"
-IDR_PAYLOAD_ICON_BLACK RCDATA                  "..\\plugin\\icon_balck.svg"
+IDR_PAYLOAD_ICON_BLACK RCDATA                  "..\\plugin\\icon_black.svg"
+IDR_PAYLOAD_RESOURCE_XML RCDATA                "..\\plugin\\InsetFace.resource.xml"
 
 #ifdef APSTUDIO_INVOKED
 /////////////////////////////////////////////////////////////////////////////

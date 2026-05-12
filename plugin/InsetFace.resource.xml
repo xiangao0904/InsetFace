@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resources>
+  <resource language="Japanese">
+    <string id="Title">面のインセット</string>
+    <string id="MenuName">面のインセット</string>
+    <string id="Thickness">厚み</string>
+    <string id="Depth">深さ</string>
+    <string id="Mode">モード</string>
+    <string id="ModeRegion">リージョン</string>
+    <string id="ModeIndividual">個別</string>
+    <string id="Apply">適用</string>
+    <string id="Cancel">キャンセル</string>
+    <string id="StatusFormat">面のインセット  面数:%u  厚み: %.3f  深さ: %.3f  モード:%s</string>
+    <string id="StatusWarningFormat">面のインセット  面数:%u  厚み: %.3f  深さ: %.3f  モード:%s  警告:%s</string>
+    <string id="StatusNoSelectedFaces">面のインセット: 面が選択されていません。</string>
+    <string id="StatusPreviewBuildFailed">面のインセット: プレビューの生成に失敗しました。</string>
+    <string id="UndoLabel">面のインセット</string>
+    <string id="WarnZeroAreaFaceSkipped">面積ゼロの面をスキップしました</string>
+    <string id="WarnPlaneFitFailed">平面フィットに失敗しました</string>
+    <string id="WarnNonManifoldSkipped">非多様体領域をスキップしました</string>
+    <string id="WarnDegenerateBoundarySkipped">退化した境界をスキップしました</string>
+    <string id="WarnBoundaryExtractionFailed">境界抽出に失敗しました</string>
+    <string id="WarnDegenerateEdgeSkipped">退化した辺をスキップしました</string>
+    <string id="WarnParallelEdgeFallback">平行辺フォールバックを使用しました</string>
+    <string id="WarnCollapsedClamped">オフセットが潰れたため制限しました</string>
+    <string id="WarnCollapsed">オフセットが潰れました</string>
+    <string id="WarnFaceInsetFailed">面ごとのインセットに失敗しました</string>
+    <string id="WarnPatchSolveFailed">リージョンの解決に失敗しました</string>
+  </resource>
+  <resource language="Chinese">
+    <string id="Title">面内插</string>
+    <string id="MenuName">面内插</string>
+    <string id="Thickness">厚度</string>
+    <string id="Depth">深度</string>
+    <string id="Mode">模式</string>
+    <string id="ModeRegion">区域</string>
+    <string id="ModeIndividual">单独</string>
+    <string id="Apply">应用</string>
+    <string id="Cancel">取消</string>
+    <string id="StatusFormat">面内插  面数:%u  厚度: %.3f  深度: %.3f  模式:%s</string>
+    <string id="StatusWarningFormat">面内插  面数:%u  厚度: %.3f  深度: %.3f  模式:%s  警告:%s</string>
+    <string id="StatusNoSelectedFaces">面内插：当前没有选中的面。</string>
+    <string id="StatusPreviewBuildFailed">面内插：预览生成失败。</string>
+    <string id="UndoLabel">面内插</string>
+    <string id="WarnZeroAreaFaceSkipped">已跳过零面积面</string>
+    <string id="WarnPlaneFitFailed">局部平面拟合失败</string>
+    <string id="WarnNonManifoldSkipped">已跳过非流形区域</string>
+    <string id="WarnDegenerateBoundarySkipped">已跳过退化边界</string>
+    <string id="WarnBoundaryExtractionFailed">边界提取失败</string>
+    <string id="WarnDegenerateEdgeSkipped">已跳过退化边</string>
+    <string id="WarnParallelEdgeFallback">已回退为平行边处理</string>
+    <string id="WarnCollapsedClamped">偏移塌缩，已限制</string>
+    <string id="WarnCollapsed">偏移塌缩</string>
+    <string id="WarnFaceInsetFailed">单面内插失败</string>
+    <string id="WarnPatchSolveFailed">区域求解失败</string>
+  </resource>
+  <resource language="English" default="1">
+    <string id="Title">Inset Face</string>
+    <string id="MenuName">Inset Face</string>
+    <string id="Thickness">Thickness</string>
+    <string id="Depth">Depth</string>
+    <string id="Mode">Mode</string>
+    <string id="ModeRegion">Region</string>
+    <string id="ModeIndividual">Individual</string>
+    <string id="Apply">Apply</string>
+    <string id="Cancel">Cancel</string>
+    <string id="StatusFormat">Inset Face  Faces:%u  Thickness: %.3f  Depth: %.3f  Mode:%s</string>
+    <string id="StatusWarningFormat">Inset Face  Faces:%u  Thickness: %.3f  Depth: %.3f  Mode:%s  Warning:%s</string>
+    <string id="StatusNoSelectedFaces">Inset Face: no selected faces.</string>
+    <string id="StatusPreviewBuildFailed">Inset Face: preview build failed.</string>
+    <string id="UndoLabel">Inset Face</string>
+    <string id="WarnZeroAreaFaceSkipped">zero-area face skipped</string>
+    <string id="WarnPlaneFitFailed">plane fit failed</string>
+    <string id="WarnNonManifoldSkipped">non-manifold skipped</string>
+    <string id="WarnDegenerateBoundarySkipped">degenerate boundary skipped</string>
+    <string id="WarnBoundaryExtractionFailed">boundary extraction failed</string>
+    <string id="WarnDegenerateEdgeSkipped">degenerate edge skipped</string>
+    <string id="WarnParallelEdgeFallback">parallel-edge fallback</string>
+    <string id="WarnCollapsedClamped">collapsed, clamped</string>
+    <string id="WarnCollapsed">collapsed</string>
+    <string id="WarnFaceInsetFailed">face inset failed</string>
+    <string id="WarnPatchSolveFailed">patch solve failed</string>
+  </resource>
+</resources>

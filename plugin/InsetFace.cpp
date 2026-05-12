@@ -18,11 +18,14 @@
 #include <vector>
 #include "MQBasePlugin.h"
 #include "MQ3DLib.h"
+#include "MQSetting.h"
 #include "MQSelectOperation.h"
 #include "MQWidget.h"
+#include "Language.h"
 
 static const DWORD kInsetFaceProductId = 0x56A31D20;
 static const DWORD kInsetFacePluginId = 0x5A1E7F44;
+static const wchar_t* kResourceFileName = L"InsetFace.resource.xml";
 
 static const double kThicknessScale = 0.05;
 static const int kDragThresholdPixels = 4;
@@ -30,6 +33,84 @@ static const double kGeometryEpsilon = 1e-6;
 static const double kAngleEpsilon = 1e-8;
 static const int kInteriorSolveIterations = 80;
 static const double kMaxMiterFactor = 8.0;
+
+MQBasePlugin* GetPluginClass();
+
+static std::wstring Trim(const std::wstring& value)
+{
+	size_t first = 0;
+	while (first < value.size() && iswspace(value[first])) {
+		++first;
+	}
+	size_t last = value.size();
+	while (last > first && iswspace(value[last - 1])) {
+		--last;
+	}
+	return value.substr(first, last - first);
+}
+
+static std::wstring ToLowerWide(std::wstring value)
+{
+	std::transform(value.begin(), value.end(), value.begin(), [](wchar_t ch) {
+		return static_cast<wchar_t>(towlower(ch));
+	});
+	return value;
+}
+
+static std::wstring GetDirectoryName(const std::wstring& path)
+{
+	size_t pos = path.find_last_of(L"\\/");
+	if (pos == std::wstring::npos) return std::wstring();
+	return path.substr(0, pos);
+}
+
+static std::wstring JoinPath(const std::wstring& left, const std::wstring& right)
+{
+	if (left.empty()) return right;
+	if (right.empty()) return left;
+	const wchar_t tail = left[left.size() - 1];
+	if (tail == L'\\' || tail == L'/') {
+		return left + right;
+	}
+	return left + L"\\" + right;
+}
+
+static std::wstring GetPluginModuleDirectory()
+{
+	HMODULE module = NULL;
+	if (!GetModuleHandleExW(
+		GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+		reinterpret_cast<LPCWSTR>(&kInsetFaceProductId),
+		&module)) {
+		return std::wstring();
+	}
+
+	wchar_t path[MAX_PATH] = {};
+	DWORD length = GetModuleFileNameW(module, path, MAX_PATH);
+	if (length == 0 || length >= MAX_PATH) {
+		return std::wstring();
+	}
+
+	return GetDirectoryName(std::wstring(path, length));
+}
+
+static std::wstring NormalizeLanguageName(std::wstring language)
+{
+	language = ToLowerWide(Trim(language));
+	if (language.empty()) return L"English";
+
+	if (language == L"ja" || language == L"ja-jp" || language.find(L"japan") != std::wstring::npos) {
+		return L"Japanese";
+	}
+	if (language == L"en" || language == L"en-us" || language == L"en-gb" || language.find(L"english") != std::wstring::npos) {
+		return L"English";
+	}
+	if (language == L"zh" || language == L"zh-cn" || language == L"zh-sg" || language.find(L"chinese") != std::wstring::npos || language.find(L"zh-hans") != std::wstring::npos) {
+		return L"Chinese";
+	}
+
+	return language;
+}
 
 struct Point2D
 {
@@ -401,6 +482,9 @@ public:
 	BOOL OnLeftButtonUp(MQDocument doc, MQScene scene, MOUSE_BUTTON_STATE& state) override;
 	BOOL OnMouseMove(MQDocument doc, MQScene scene, MOUSE_BUTTON_STATE& state) override;
 	BOOL OnKeyDown(MQDocument doc, MQScene scene, int key, MOUSE_BUTTON_STATE& state) override;
+	void LoadResource();
+	std::wstring LocalizedText(const char* key, const wchar_t* fallback = L"") const;
+	void AppendLocalizedWarning(std::wstring& target, const char* key) const;
 
 private:
 	struct DragState
@@ -441,6 +525,7 @@ private:
 	PreviewMesh m_Preview;
 	std::set<SelectedFaceRef> m_SelectedFaces;
 	MQSelectOperation m_SelectOperation;
+	MLanguage m_Language;
 	DragState m_Drag;
 	HCURSOR m_MoveCursor;
 	InsetFaceWindow* m_Window;
@@ -497,13 +582,14 @@ InsetFaceWindow::InsetFaceWindow(int id, InsetFacePlugin* plugin)
 	, m_Plugin(plugin)
 	, m_Syncing(false)
 {
-	SetTitle(L"Inset Face");
+	m_Plugin->LoadResource();
+	SetTitle(m_Plugin->LocalizedText("Title", L"Inset Face"));
 
 	MQFrame* root = CreateVerticalFrame(this);
 	root->SetOutSpace(0.2);
 
 	MQFrame* thickness_frame = CreateHorizontalFrame(root);
-	CreateLabel(thickness_frame, L"Thickness");
+	CreateLabel(thickness_frame, m_Plugin->LocalizedText("Thickness", L"Thickness"));
 	m_Thickness = CreateDoubleSpinBox(thickness_frame);
 	m_Thickness->SetMin(-1e8);
 	m_Thickness->SetMax(1e8);
@@ -513,7 +599,7 @@ InsetFaceWindow::InsetFaceWindow(int id, InsetFacePlugin* plugin)
 	m_Thickness->AddChangingEvent(this, &InsetFaceWindow::ThicknessChanged);
 
 	MQFrame* depth_frame = CreateHorizontalFrame(root);
-	CreateLabel(depth_frame, L"Depth");
+	CreateLabel(depth_frame, m_Plugin->LocalizedText("Depth", L"Depth"));
 	m_Depth = CreateDoubleSpinBox(depth_frame);
 	m_Depth->SetMin(-1e8);
 	m_Depth->SetMax(1e8);
@@ -523,17 +609,17 @@ InsetFaceWindow::InsetFaceWindow(int id, InsetFacePlugin* plugin)
 	m_Depth->AddChangingEvent(this, &InsetFaceWindow::DepthChanged);
 
 	MQFrame* mode_frame = CreateHorizontalFrame(root);
-	CreateLabel(mode_frame, L"Mode");
-	m_RegionMode = CreateRadioButton(mode_frame, L"Region");
-	m_IndividualMode = CreateRadioButton(mode_frame, L"Individual");
+	CreateLabel(mode_frame, m_Plugin->LocalizedText("Mode", L"Mode"));
+	m_RegionMode = CreateRadioButton(mode_frame, m_Plugin->LocalizedText("ModeRegion", L"Region"));
+	m_IndividualMode = CreateRadioButton(mode_frame, m_Plugin->LocalizedText("ModeIndividual", L"Individual"));
 	m_RegionMode->AddChangedEvent(this, &InsetFaceWindow::RegionModeChanged);
 	m_IndividualMode->AddChangedEvent(this, &InsetFaceWindow::IndividualModeChanged);
 
 	MQFrame* button_frame = CreateHorizontalFrame(root);
 	button_frame->SetUniformSize(true);
-	m_ApplyButton = CreateButton(button_frame, L"Apply");
+	m_ApplyButton = CreateButton(button_frame, m_Plugin->LocalizedText("Apply", L"Apply"));
 	m_ApplyButton->AddClickEvent(this, &InsetFaceWindow::ApplyClicked);
-	m_CancelButton = CreateButton(button_frame, L"Cancel");
+	m_CancelButton = CreateButton(button_frame, m_Plugin->LocalizedText("Cancel", L"Cancel"));
 	m_CancelButton->AddClickEvent(this, &InsetFaceWindow::CancelClicked);
 
 	SyncFromPlugin();
@@ -620,6 +706,31 @@ InsetFacePlugin::InsetFacePlugin()
 {
 }
 
+void InsetFacePlugin::LoadResource()
+{
+	if (m_Language.Contains()) return;
+
+	std::wstring language = NormalizeLanguageName(GetSettingValue(MQSETTINGVALUE_LANGUAGE));
+	std::wstring resource_path = JoinPath(GetPluginModuleDirectory(), kResourceFileName);
+	if (!m_Language.Load(language, resource_path)) {
+		m_Language.Load(L"English", resource_path);
+	}
+}
+
+std::wstring InsetFacePlugin::LocalizedText(const char* key, const wchar_t* fallback) const
+{
+	const wchar_t* localized = m_Language.Search(key);
+	if (localized != NULL && localized[0] != L'\0') {
+		return localized;
+	}
+	return fallback != NULL ? std::wstring(fallback) : std::wstring();
+}
+
+void InsetFacePlugin::AppendLocalizedWarning(std::wstring& target, const char* key) const
+{
+	AppendWarning(target, LocalizedText(key).c_str());
+}
+
 void InsetFacePlugin::GetPlugInID(DWORD* Product, DWORD* ID)
 {
 	*Product = kInsetFaceProductId;
@@ -633,11 +744,15 @@ const char* InsetFacePlugin::GetPlugInName(void)
 
 const wchar_t* InsetFacePlugin::EnumString(void)
 {
-	return L"Inset Face";
+	LoadResource();
+	static std::wstring menu_name;
+	menu_name = LocalizedText("MenuName", L"Inset Face");
+	return menu_name.c_str();
 }
 
 BOOL InsetFacePlugin::Initialize()
 {
+	LoadResource();
 	m_MoveCursor = GetResourceCursor(MQCURSOR_MOVE);
 	return TRUE;
 }
@@ -651,6 +766,7 @@ void InsetFacePlugin::Exit()
 BOOL InsetFacePlugin::Activate(MQDocument doc, BOOL flag)
 {
 	if (flag) {
+		LoadResource();
 		ResetToolState(false);
 		SyncSelectionFromDocument(doc);
 		m_Window = new InsetFaceWindow(MQWindow::GetSystemWidgetID(MQSystemWidget::OptionPanel), this);
@@ -701,20 +817,26 @@ void InsetFacePlugin::InvalidatePreview()
 
 void InsetFacePlugin::SetStatus()
 {
+	LoadResource();
 	wchar_t text[512];
+	const std::wstring region_mode = LocalizedText("ModeRegion", L"Region");
+	const std::wstring individual_mode = LocalizedText("ModeIndividual", L"Individual");
+	const wchar_t* mode_text = m_Params.CurrentMode == InsetParameters::ModeRegion ? region_mode.c_str() : individual_mode.c_str();
 	if (m_LastWarning.empty()) {
-		swprintf_s(text, L"Inset Face  Faces:%u  Thickness: %.3f  Depth: %.3f  Mode:%s",
+		const std::wstring format = LocalizedText("StatusFormat", L"Inset Face  Faces:%u  Thickness: %.3f  Depth: %.3f  Mode:%s");
+		swprintf_s(text, format.c_str(),
 			(unsigned)m_SelectedFaces.size(),
 			m_Params.Thickness,
 			m_Params.Depth,
-			m_Params.CurrentMode == InsetParameters::ModeRegion ? L"Region" : L"Individual");
+			mode_text);
 	}
 	else {
-		swprintf_s(text, L"Inset Face  Faces:%u  Thickness: %.3f  Depth: %.3f  Mode:%s  Warning:%s",
+		const std::wstring format = LocalizedText("StatusWarningFormat", L"Inset Face  Faces:%u  Thickness: %.3f  Depth: %.3f  Mode:%s  Warning:%s");
+		swprintf_s(text, format.c_str(),
 			(unsigned)m_SelectedFaces.size(),
 			m_Params.Thickness,
 			m_Params.Depth,
-			m_Params.CurrentMode == InsetParameters::ModeRegion ? L"Region" : L"Individual",
+			mode_text,
 			m_LastWarning.c_str());
 	}
 	SetStatusString(text);
@@ -1161,7 +1283,7 @@ bool InsetFacePlugin::FitLocalPlane(TempRegion& region, const std::vector<FaceIn
 		if (!faces.empty()) normal = faces[0].FaceNormal;
 	}
 	if (GetInnerProduct(normal, normal) <= 1e-12f) {
-		AppendWarning(region.Warning, L"zero-area face skipped");
+		AppendLocalizedWarning(region.Warning, "WarnZeroAreaFaceSkipped");
 		return false;
 	}
 	region.PlaneNormal = Normalize(normal);
@@ -1189,7 +1311,7 @@ bool InsetFacePlugin::FitLocalPlane(TempRegion& region, const std::vector<FaceIn
 		plane_u = MQPoint(0, 1, 0) - region.PlaneNormal * GetInnerProduct(MQPoint(0, 1, 0), region.PlaneNormal);
 	}
 	if (GetInnerProduct(plane_u, plane_u) <= 1e-12f) {
-		AppendWarning(region.Warning, L"plane fit failed");
+		AppendLocalizedWarning(region.Warning, "WarnPlaneFitFailed");
 		return false;
 	}
 
@@ -1223,7 +1345,7 @@ bool InsetFacePlugin::ExtractBoundaryLoops(TempRegion& region)
 	}
 
 	if (boundary_halfedges.empty()) {
-		AppendWarning(region.Warning, L"non-manifold skipped");
+		AppendLocalizedWarning(region.Warning, "WarnNonManifoldSkipped");
 		return false;
 	}
 
@@ -1264,14 +1386,14 @@ bool InsetFacePlugin::ExtractBoundaryLoops(TempRegion& region)
 		}
 
 		if (loop.Vertices.size() < 3) {
-			AppendWarning(region.Warning, L"degenerate boundary skipped");
+			AppendLocalizedWarning(region.Warning, "WarnDegenerateBoundarySkipped");
 			return false;
 		}
 		region.BoundaryLoops.push_back(loop);
 	}
 
 	if (region.BoundaryLoops.empty()) {
-		AppendWarning(region.Warning, L"boundary extraction failed");
+		AppendLocalizedWarning(region.Warning, "WarnBoundaryExtractionFailed");
 		return false;
 	}
 
@@ -1294,7 +1416,7 @@ bool InsetFacePlugin::OffsetLoop2D(const std::vector<Point2D>& loop_points, doub
 
 	double source_area = PolygonArea2D(loop_points);
 	if (std::fabs(source_area) <= kGeometryEpsilon) {
-		AppendWarning(warning, L"zero-area face skipped");
+		AppendLocalizedWarning(warning, "WarnZeroAreaFaceSkipped");
 		return false;
 	}
 	double orientation = source_area >= 0.0 ? 1.0 : -1.0;
@@ -1317,7 +1439,7 @@ bool InsetFacePlugin::OffsetLoop2D(const std::vector<Point2D>& loop_points, doub
 			double edge1_len = Length2D(edge1);
 			if (edge0_len <= kGeometryEpsilon || edge1_len <= kGeometryEpsilon) {
 				valid = false;
-				AppendWarning(warning, L"degenerate edge skipped");
+				AppendLocalizedWarning(warning, "WarnDegenerateEdgeSkipped");
 				break;
 			}
 
@@ -1351,7 +1473,7 @@ bool InsetFacePlugin::OffsetLoop2D(const std::vector<Point2D>& loop_points, doub
 				if (max_length > 0.0 && Length2D(delta) > max_length) {
 					Point2D dir = Normalize2D(delta);
 					intersection = curr + dir * max_length;
-					AppendWarning(warning, L"parallel-edge fallback");
+					AppendLocalizedWarning(warning, "WarnParallelEdgeFallback");
 				}
 			}
 
@@ -1369,13 +1491,13 @@ bool InsetFacePlugin::OffsetLoop2D(const std::vector<Point2D>& loop_points, doub
 			continue;
 		}
 
-		if (had_parallel_fallback) AppendWarning(warning, L"parallel-edge fallback");
-		if (scale < 0.999) AppendWarning(warning, L"collapsed, clamped");
+		if (had_parallel_fallback) AppendLocalizedWarning(warning, "WarnParallelEdgeFallback");
+		if (scale < 0.999) AppendLocalizedWarning(warning, "WarnCollapsedClamped");
 		out_points = candidate;
 		return true;
 	}
 
-	AppendWarning(warning, L"collapsed");
+	AppendLocalizedWarning(warning, "WarnCollapsed");
 	return false;
 }
 
@@ -1510,7 +1632,7 @@ bool InsetFacePlugin::BuildTempRegion(MQObject obj, int object_index, const std:
 				region.HalfEdges[other].Pair = (int)hi;
 			}
 			else {
-				AppendWarning(region.Warning, L"non-manifold skipped");
+				AppendLocalizedWarning(region.Warning, "WarnNonManifoldSkipped");
 			}
 		}
 		else {
@@ -1521,12 +1643,12 @@ bool InsetFacePlugin::BuildTempRegion(MQObject obj, int object_index, const std:
 	ClassifyBoundaryElements(region);
 	for (size_t fi = 0; fi < region.Faces.size(); ++fi) {
 		if (!BuildFaceLocalInset(region, region.Faces[fi])) {
-			AppendWarning(region.Warning, L"face inset failed");
+			AppendLocalizedWarning(region.Warning, "WarnFaceInsetFailed");
 			return false;
 		}
 	}
 	if (!SolvePatchInsetVertices(region, m_Params.Depth)) {
-		AppendWarning(region.Warning, L"patch solve failed");
+		AppendLocalizedWarning(region.Warning, "WarnPatchSolveFailed");
 		return false;
 	}
 
@@ -1953,12 +2075,15 @@ void InsetFacePlugin::ResetAfterApply(MQDocument doc)
 
 bool InsetFacePlugin::ApplyPreview(MQDocument doc)
 {
+	LoadResource();
 	if (m_SelectedFaces.empty()) {
-		SetStatusString(L"Inset Face: no selected faces.");
+		const std::wstring text = LocalizedText("StatusNoSelectedFaces", L"Inset Face: no selected faces.");
+		SetStatusString(text.c_str());
 		return false;
 	}
 	if (!EnsurePreview(doc)) {
-		SetStatusString(L"Inset Face: preview build failed.");
+		const std::wstring text = LocalizedText("StatusPreviewBuildFailed", L"Inset Face: preview build failed.");
+		SetStatusString(text.c_str());
 		return false;
 	}
 
@@ -1974,7 +2099,8 @@ bool InsetFacePlugin::ApplyPreview(MQDocument doc)
 	}
 
 	if (modified) {
-		UpdateUndo(L"Inset Face");
+		const std::wstring undo_label = LocalizedText("UndoLabel", L"Inset Face");
+		UpdateUndo(undo_label.c_str());
 		ResetAfterApply(doc);
 	}
 	else {

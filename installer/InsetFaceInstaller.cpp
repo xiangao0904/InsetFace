@@ -24,10 +24,11 @@ const wchar_t* kAppTitle = L"InsetFace Installer";
 const wchar_t* kProcessName = L"Metaseq.exe";
 const wchar_t* kPluginFileName = L"InsetFace.dll";
 const wchar_t* kIconFileName = L"cmd_insetface.svg";
+const wchar_t* kResourceFileName = L"InsetFace.resource.xml";
 const wchar_t* kManifestFileName = L"InsetFace.install.json";
 const wchar_t* kRegistryUninstall = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
 const wchar_t* kRegistryUninstallWow6432 = L"SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
-const wchar_t* kMetasequoiaDisplayName = L"Metasequoia 4 (64bit)";
+const wchar_t* kRegistryAppPaths = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\Metaseq.exe";
 const char* kWidgetName = "BtnComPlugin.56a31d20.5a1e7f44.0";
 const char* kInstallerVersion = "1";
 
@@ -81,8 +82,18 @@ struct AppState
 	HWND InstallButton;
 	HWND RepairButton;
 	HWND UninstallButton;
+	HWND BrandIcon;
+	HWND HeaderLabel;
+	HWND HintLabel;
+	HWND StatusLabel;
 	HWND StatusEdit;
 	HFONT UiFont;
+	HFONT HeaderFont;
+	HFONT HintFont;
+	HFONT MonoFont;
+	HICON AppIconLarge;
+	HICON AppIconSmall;
+	HBRUSH BackgroundBrush;
 };
 
 AppState* g_app = NULL;
@@ -111,6 +122,11 @@ static std::wstring ToLowerWide(std::wstring value)
 		return static_cast<wchar_t>(towlower(ch));
 	});
 	return value;
+}
+
+static bool ContainsInsensitive(const std::wstring& value, const std::wstring& needle)
+{
+	return ToLowerWide(value).find(ToLowerWide(needle)) != std::wstring::npos;
 }
 
 static bool EndsWithInsensitive(const std::wstring& value, const std::wstring& suffix)
@@ -164,6 +180,18 @@ static std::wstring NormalizePath(std::wstring value)
 		value.erase(value.size() - 1);
 	}
 	return value;
+}
+
+static std::wstring GetEnvironmentString(const wchar_t* name)
+{
+	DWORD length = GetEnvironmentVariableW(name, NULL, 0);
+	if (length == 0) return std::wstring();
+
+	std::vector<wchar_t> buffer(length);
+	if (GetEnvironmentVariableW(name, buffer.data(), length) == 0) {
+		return std::wstring();
+	}
+	return Trim(buffer.data());
 }
 
 static bool FileExists(const std::wstring& path)
@@ -850,10 +878,38 @@ static bool QueryRegistryString(HKEY root, const std::wstring& subkey, const wch
 	return !out_value.empty();
 }
 
-static bool FindMetasequoiaRootInRegistryKey(const std::wstring& base_subkey, std::wstring& out_root)
+static bool TryCandidateRoot(const std::wstring& candidate, std::wstring& out_root)
+{
+	std::wstring normalized = NormalizePath(candidate);
+	if (!ValidateMetasequoiaRoot(normalized)) {
+		return false;
+	}
+	out_root = normalized;
+	return true;
+}
+
+static bool LooksLikeMetasequoiaDisplayName(const std::wstring& display_name)
+{
+	if (display_name.empty()) return false;
+	return ContainsInsensitive(display_name, L"Metasequoia") || ContainsInsensitive(display_name, L"Metaseq");
+}
+
+static bool FindMetasequoiaRootFromAppPath(HKEY root, std::wstring& out_root)
+{
+	std::wstring candidate;
+	if (QueryRegistryString(root, kRegistryAppPaths, NULL, candidate) && TryCandidateRoot(candidate, out_root)) {
+		return true;
+	}
+	if (QueryRegistryString(root, kRegistryAppPaths, L"Path", candidate) && TryCandidateRoot(candidate, out_root)) {
+		return true;
+	}
+	return false;
+}
+
+static bool FindMetasequoiaRootInRegistryKey(HKEY root, const std::wstring& base_subkey, std::wstring& out_root)
 {
 	HKEY base_key = NULL;
-	if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, base_subkey.c_str(), 0, KEY_READ, &base_key) != ERROR_SUCCESS) {
+	if (RegOpenKeyExW(root, base_subkey.c_str(), 0, KEY_READ, &base_key) != ERROR_SUCCESS) {
 		return false;
 	}
 
@@ -864,15 +920,13 @@ static bool FindMetasequoiaRootInRegistryKey(const std::wstring& base_subkey, st
 		std::wstring subkey_name(name_buffer, name_length);
 		std::wstring full_subkey = base_subkey + L"\\" + subkey_name;
 		std::wstring display_name;
-		if (QueryRegistryString(HKEY_LOCAL_MACHINE, full_subkey, L"DisplayName", display_name)) {
-			if (ToLowerWide(display_name).find(ToLowerWide(kMetasequoiaDisplayName)) != std::wstring::npos) {
+		if (QueryRegistryString(root, full_subkey, L"DisplayName", display_name)) {
+			if (LooksLikeMetasequoiaDisplayName(display_name)) {
 				std::wstring candidate;
-				if (!QueryRegistryString(HKEY_LOCAL_MACHINE, full_subkey, L"InstallLocation", candidate)) {
-					QueryRegistryString(HKEY_LOCAL_MACHINE, full_subkey, L"DisplayIcon", candidate);
+				if (!QueryRegistryString(root, full_subkey, L"InstallLocation", candidate)) {
+					QueryRegistryString(root, full_subkey, L"DisplayIcon", candidate);
 				}
-				candidate = NormalizePath(candidate);
-				if (ValidateMetasequoiaRoot(candidate)) {
-					out_root = candidate;
+				if (TryCandidateRoot(candidate, out_root)) {
 					RegCloseKey(base_key);
 					return true;
 				}
@@ -886,13 +940,53 @@ static bool FindMetasequoiaRootInRegistryKey(const std::wstring& base_subkey, st
 	return false;
 }
 
+static bool FindMetasequoiaRootInKnownLocations(std::wstring& out_root)
+{
+	std::vector<std::wstring> candidates;
+	std::wstring program_files = GetEnvironmentString(L"ProgramFiles");
+	std::wstring program_files_x86 = GetEnvironmentString(L"ProgramFiles(x86)");
+
+	if (!program_files.empty()) {
+		candidates.push_back(JoinPath(program_files, L"tetraface\\Metasequoia4"));
+		candidates.push_back(JoinPath(program_files, L"Metasequoia4"));
+	}
+	if (!program_files_x86.empty()) {
+		candidates.push_back(JoinPath(program_files_x86, L"tetraface\\Metasequoia4"));
+		candidates.push_back(JoinPath(program_files_x86, L"Metasequoia4"));
+	}
+
+	candidates.push_back(L"D:\\software\\Metasequoia4");
+
+	for (size_t i = 0; i < candidates.size(); ++i) {
+		if (TryCandidateRoot(candidates[i], out_root)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 static std::wstring AutoDetectMetasequoiaRoot()
 {
 	std::wstring root;
-	if (FindMetasequoiaRootInRegistryKey(kRegistryUninstall, root)) {
+	if (FindMetasequoiaRootFromAppPath(HKEY_CURRENT_USER, root)) {
 		return root;
 	}
-	if (FindMetasequoiaRootInRegistryKey(kRegistryUninstallWow6432, root)) {
+	if (FindMetasequoiaRootFromAppPath(HKEY_LOCAL_MACHINE, root)) {
+		return root;
+	}
+	if (FindMetasequoiaRootInRegistryKey(HKEY_CURRENT_USER, kRegistryUninstall, root)) {
+		return root;
+	}
+	if (FindMetasequoiaRootInRegistryKey(HKEY_CURRENT_USER, kRegistryUninstallWow6432, root)) {
+		return root;
+	}
+	if (FindMetasequoiaRootInRegistryKey(HKEY_LOCAL_MACHINE, kRegistryUninstall, root)) {
+		return root;
+	}
+	if (FindMetasequoiaRootInRegistryKey(HKEY_LOCAL_MACHINE, kRegistryUninstallWow6432, root)) {
+		return root;
+	}
+	if (FindMetasequoiaRootInKnownLocations(root)) {
 		return root;
 	}
 	return std::wstring();
@@ -1074,6 +1168,7 @@ static void CollectDefaultLayoutEntries(const std::wstring& root, std::vector<La
 static bool RunInstallOrRepair(const std::wstring& root, InstallAction action)
 {
 	std::wstring plugin_path = JoinPath(root, L"Plugins\\Command\\" + std::wstring(kPluginFileName));
+	std::wstring resource_path = JoinPath(root, L"Plugins\\Command\\" + std::wstring(kResourceFileName));
 	std::wstring white_icon_path = JoinPath(root, L"Data\\Icon\\White\\" + std::wstring(kIconFileName));
 	std::wstring black_icon_path = JoinPath(root, L"Data\\Icon\\Black\\" + std::wstring(kIconFileName));
 	std::wstring manifest_path = JoinPath(root, L"Plugins\\Command\\" + std::wstring(kManifestFileName));
@@ -1086,6 +1181,12 @@ static bool RunInstallOrRepair(const std::wstring& root, InstallAction action)
 
 	if (!ApplyPayloadFile(g_app->Instance, IDR_PAYLOAD_DLL, plugin_path, &manifest.DllHash)) {
 		AppendStatus(L"Failed to write InsetFace.dll.");
+		return false;
+	}
+
+	AppendStatus(L"Deploying language resource...");
+	if (!ApplyPayloadFile(g_app->Instance, IDR_PAYLOAD_RESOURCE_XML, resource_path, NULL)) {
+		AppendStatus(L"Failed to write InsetFace.resource.xml.");
 		return false;
 	}
 
@@ -1124,6 +1225,7 @@ static bool RunInstallOrRepair(const std::wstring& root, InstallAction action)
 static bool RunUninstall(const std::wstring& root)
 {
 	std::wstring manifest_path = JoinPath(root, L"Plugins\\Command\\" + std::wstring(kManifestFileName));
+	std::wstring resource_path = JoinPath(root, L"Plugins\\Command\\" + std::wstring(kResourceFileName));
 	InstallManifest manifest;
 	if (!LoadManifest(manifest_path, manifest)) {
 		manifest.DllPath = JoinPath(root, L"Plugins\\Command\\" + std::wstring(kPluginFileName));
@@ -1154,6 +1256,10 @@ static bool RunUninstall(const std::wstring& root)
 	}
 	if (!manifest.BlackIconPath.empty() && !DeleteFileIfExists(manifest.BlackIconPath)) {
 		AppendStatus(L"Failed to remove dark-theme icon.");
+		return false;
+	}
+	if (!DeleteFileIfExists(resource_path)) {
+		AppendStatus(L"Failed to remove InsetFace.resource.xml.");
 		return false;
 	}
 
@@ -1200,7 +1306,7 @@ static void ChooseMetaseqExecutable(HWND owner)
 	dialog.lpstrFilter = L"Metaseq executable\0Metaseq.exe\0Executable files\0*.exe\0All files\0*.*\0";
 	dialog.lpstrFile = file_buffer;
 	dialog.nMaxFile = MAX_PATH;
-	dialog.lpstrTitle = L"Select Metaseq.exe";
+	dialog.lpstrTitle = L"Choose Metaseq.exe";
 	dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
 	dialog.lpstrDefExt = L"exe";
 
@@ -1217,7 +1323,7 @@ static void RunAction(InstallAction action)
 {
 	std::wstring root = ReadSelectedRoot();
 	if (!ValidateMetasequoiaRoot(root)) {
-		MessageBoxW(g_app->Window, L"Select a valid Metasequoia 4 install directory first.", kAppTitle, MB_ICONWARNING | MB_OK);
+		MessageBoxW(g_app->Window, L"Choose a valid Metasequoia install directory first.", kAppTitle, MB_ICONWARNING | MB_OK);
 		return;
 	}
 
@@ -1280,29 +1386,88 @@ static HWND CreateAppControl(DWORD style, DWORD ex_style, const wchar_t* class_n
 	return handle;
 }
 
+static HFONT CreateUiFont(int height, int weight, bool italic, const wchar_t* face_name)
+{
+	LOGFONTW font = {};
+	font.lfHeight = height;
+	font.lfWeight = weight;
+	font.lfItalic = italic ? TRUE : FALSE;
+	font.lfQuality = CLEARTYPE_QUALITY;
+	wcscpy_s(font.lfFaceName, face_name);
+	return CreateFontIndirectW(&font);
+}
+
+static void InitializeVisuals()
+{
+	if (g_app == NULL) return;
+
+	g_app->HeaderFont = CreateUiFont(-24, FW_SEMIBOLD, false, L"Segoe UI");
+	g_app->HintFont = CreateUiFont(-15, FW_NORMAL, false, L"Segoe UI");
+	g_app->MonoFont = CreateUiFont(-15, FW_NORMAL, false, L"Consolas");
+	g_app->BackgroundBrush = CreateSolidBrush(RGB(245, 247, 250));
+	g_app->AppIconLarge = static_cast<HICON>(LoadImageW(g_app->Instance, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON, 48, 48, LR_DEFAULTCOLOR));
+	g_app->AppIconSmall = static_cast<HICON>(LoadImageW(g_app->Instance, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON, 20, 20, LR_DEFAULTCOLOR));
+
+	if (g_app->HeaderFont == NULL) g_app->HeaderFont = g_app->UiFont;
+	if (g_app->HintFont == NULL) g_app->HintFont = g_app->UiFont;
+	if (g_app->MonoFont == NULL) g_app->MonoFont = g_app->UiFont;
+}
+
 static void CreateChildControls()
 {
-	CreateAppControl(WS_CHILD | WS_VISIBLE, 0, L"STATIC", L"Metasequoia root (you can paste a folder path or browse to Metaseq.exe)", 16, 16, 560, 20, 0);
-	g_app->PathEdit = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, WS_EX_CLIENTEDGE, L"EDIT", L"", 16, 40, 450, 24, IDC_ROOT_PATH);
-	g_app->BrowseButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 0, L"BUTTON", L"Browse...", 476, 40, 100, 24, IDC_BROWSE);
-	g_app->InstallButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON, 0, L"BUTTON", L"Install / Update", 16, 76, 140, 28, IDC_INSTALL);
-	g_app->RepairButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 0, L"BUTTON", L"Repair", 166, 76, 100, 28, IDC_REPAIR);
-	g_app->UninstallButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 0, L"BUTTON", L"Uninstall", 276, 76, 100, 28, IDC_UNINSTALL);
+	g_app->BrandIcon = CreateAppControl(WS_CHILD | WS_VISIBLE | SS_ICON, 0, L"STATIC", L"", 20, 20, 48, 48, IDC_BRAND_ICON);
+	SendMessageW(g_app->BrandIcon, STM_SETICON, reinterpret_cast<WPARAM>(g_app->AppIconLarge), 0);
+
+	g_app->HeaderLabel = CreateAppControl(WS_CHILD | WS_VISIBLE, 0, L"STATIC", L"InsetFace setup", 82, 18, 420, 28, IDC_HEADER_TITLE);
+	SendMessageW(g_app->HeaderLabel, WM_SETFONT, reinterpret_cast<WPARAM>(g_app->HeaderFont), TRUE);
+
+	g_app->HintLabel = CreateAppControl(WS_CHILD | WS_VISIBLE, 0, L"STATIC", L"Auto-detect a Metasequoia install, or point the installer at Metaseq.exe manually.", 82, 48, 560, 22, IDC_HEADER_HINT);
+	SendMessageW(g_app->HintLabel, WM_SETFONT, reinterpret_cast<WPARAM>(g_app->HintFont), TRUE);
+
+	CreateAppControl(WS_CHILD | WS_VISIBLE, 0, L"STATIC", L"Metasequoia root", 20, 96, 180, 20, 0);
+	g_app->PathEdit = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, WS_EX_CLIENTEDGE, L"EDIT", L"", 20, 120, 520, 30, IDC_ROOT_PATH);
+	SendMessageW(g_app->PathEdit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(8, 8));
+	g_app->BrowseButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 0, L"BUTTON", L"Browse...", 552, 120, 112, 30, IDC_BROWSE);
+
+	g_app->InstallButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON, 0, L"BUTTON", L"Install / Update", 20, 168, 170, 34, IDC_INSTALL);
+	g_app->RepairButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 0, L"BUTTON", L"Repair", 202, 168, 120, 34, IDC_REPAIR);
+	g_app->UninstallButton = CreateAppControl(WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 0, L"BUTTON", L"Uninstall", 334, 168, 120, 34, IDC_UNINSTALL);
+
+	g_app->StatusLabel = CreateAppControl(WS_CHILD | WS_VISIBLE, 0, L"STATIC", L"Activity log", 20, 224, 160, 20, IDC_SECTION_STATUS);
 	g_app->StatusEdit = CreateAppControl(
 		WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_VSCROLL,
 		WS_EX_CLIENTEDGE,
 		L"EDIT",
 		L"",
-		16,
-		118,
-		560,
-		250,
+		20,
+		248,
+		644,
+		262,
 		IDC_STATUS);
+	SendMessageW(g_app->StatusEdit, WM_SETFONT, reinterpret_cast<WPARAM>(g_app->MonoFont), TRUE);
+	SendMessageW(g_app->StatusEdit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(10, 10));
 }
 
 static LRESULT CALLBACK MainWindowProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam)
 {
 	switch (message) {
+	case WM_CTLCOLORSTATIC:
+		if (g_app != NULL) {
+			HDC hdc = reinterpret_cast<HDC>(wparam);
+			HWND control = reinterpret_cast<HWND>(lparam);
+			SetBkMode(hdc, TRANSPARENT);
+			if (control == g_app->HeaderLabel) {
+				SetTextColor(hdc, RGB(23, 43, 77));
+			}
+			else if (control == g_app->HintLabel || control == g_app->StatusLabel) {
+				SetTextColor(hdc, RGB(95, 103, 115));
+			}
+			else {
+				SetTextColor(hdc, RGB(44, 52, 64));
+			}
+			return reinterpret_cast<LRESULT>(g_app->BackgroundBrush);
+		}
+		break;
 	case WM_COMMAND:
 		switch (LOWORD(wparam)) {
 		case IDC_ROOT_PATH:
@@ -1348,13 +1513,16 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int show_command)
 	app.Instance = instance;
 	app.UiFont = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
 	g_app = &app;
+	InitializeVisuals();
 
 	WNDCLASSEXW window_class = {};
 	window_class.cbSize = sizeof(window_class);
 	window_class.lpfnWndProc = MainWindowProc;
 	window_class.hInstance = instance;
 	window_class.hCursor = LoadCursorW(NULL, IDC_ARROW);
-	window_class.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+	window_class.hbrBackground = app.BackgroundBrush != NULL ? app.BackgroundBrush : reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+	window_class.hIcon = app.AppIconLarge;
+	window_class.hIconSm = app.AppIconSmall;
 	window_class.lpszClassName = L"InsetFaceInstallerWindow";
 
 	if (!RegisterClassExW(&window_class)) {
@@ -1368,8 +1536,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int show_command)
 		WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
-		610,
-		430,
+		700,
+		570,
 		NULL,
 		NULL,
 		instance,
@@ -1383,10 +1551,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int show_command)
 	std::wstring detected_root = AutoDetectMetasequoiaRoot();
 	if (!detected_root.empty()) {
 		SetWindowTextW(app.PathEdit, detected_root.c_str());
-		AppendStatus(L"Detected Metasequoia root from the registry.");
+		AppendStatus(L"Auto-detected the Metasequoia install folder.");
 	}
 	else {
-		AppendStatus(L"Metasequoia was not auto-detected. Paste the install folder path or browse to Metaseq.exe.");
+		AppendStatus(L"Auto-detection did not find Metasequoia. Paste the install folder path or browse to Metaseq.exe.");
 	}
 
 	RefreshButtons();
@@ -1398,6 +1566,13 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int show_command)
 		TranslateMessage(&message);
 		DispatchMessageW(&message);
 	}
+
+	if (app.HeaderFont != NULL && app.HeaderFont != app.UiFont) DeleteObject(app.HeaderFont);
+	if (app.HintFont != NULL && app.HintFont != app.UiFont) DeleteObject(app.HintFont);
+	if (app.MonoFont != NULL && app.MonoFont != app.UiFont) DeleteObject(app.MonoFont);
+	if (app.AppIconLarge != NULL) DestroyIcon(app.AppIconLarge);
+	if (app.AppIconSmall != NULL) DestroyIcon(app.AppIconSmall);
+	if (app.BackgroundBrush != NULL) DeleteObject(app.BackgroundBrush);
 
 	return static_cast<int>(message.wParam);
 }

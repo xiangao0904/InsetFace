@@ -220,6 +220,9 @@ copy /Y "$(SolutionDir)build\$(Platform)\$(Configuration)\InsetFace.dll" "$(Proj
     <ResourceCompile Include="installer\InsetFaceInstaller.rc" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="installer\InsetFaceInstaller.ico" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="InsetFace.vcxproj">
       <Project>{6F4B9D1C-B6A6-4C26-BB7F-3D6E5C1F9B91}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>

@@ -111,6 +111,9 @@
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
     </Link>
+    <PostBuildEvent>
+      <Command>copy /Y "$(ProjectDir)plugin\InsetFace.resource.xml" "$(OutDir)InsetFace.resource.xml" &gt;nul</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Midl>
@@ -142,6 +145,9 @@
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <TargetMachine>MachineX64</TargetMachine>
     </Link>
+    <PostBuildEvent>
+      <Command>copy /Y "$(ProjectDir)plugin\InsetFace.resource.xml" "$(OutDir)InsetFace.resource.xml" &gt;nul</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <Midl>
@@ -171,6 +177,9 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
     </Link>
+    <PostBuildEvent>
+      <Command>copy /Y "$(ProjectDir)plugin\InsetFace.resource.xml" "$(OutDir)InsetFace.resource.xml" &gt;nul</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Midl>
@@ -201,8 +210,12 @@
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <TargetMachine>MachineX64</TargetMachine>
     </Link>
+    <PostBuildEvent>
+      <Command>copy /Y "$(ProjectDir)plugin\InsetFace.resource.xml" "$(OutDir)InsetFace.resource.xml" &gt;nul</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="plugin\Language.cpp" />
     <ClCompile Include="vendor\mqsdk\MQ3DLib.cpp" />
     <ClCompile Include="vendor\mqsdk\MQBasePlugin.cpp" />
     <ClCompile Include="vendor\mqsdk\MQInit.cpp" />
@@ -213,6 +226,7 @@
     <ClCompile Include="plugin\InsetFace.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="plugin\Language.h" />
     <ClInclude Include="vendor\mqsdk\MQ3DLib.h" />
     <ClInclude Include="vendor\mqsdk\MQBasePlugin.h" />
     <ClInclude Include="vendor\mqsdk\MQPlugin.h" />
@@ -223,6 +237,9 @@
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="plugin\InsetFace.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="plugin\InsetFace.resource.xml" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
