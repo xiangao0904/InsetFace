@@ -344,11 +344,11 @@ const copy: Record<Locale, Copy> = {
     blogLabel: "Technical Blog",
     blogTitle: "算法解析文章",
     blogText:
-      "这篇中文技术文章系统讲解 InsetFace 的内插面算法、Offset Even 的几何处理、交互式预览的数据流，以及插件实现细节。",
+      "这篇博客详细介绍 InsetFace 的内插面算法、Offset Even 的几何处理、交互式预览的数据流，以及插件实现细节。",
     blogCardTitle: "InsetFace Algorithm Notes",
     blogCardText:
-      "计划中的技术文章：从选面拓扑、边界偏移、深度投影到 Metasequoia 4 插件集成。",
-    blogButton: "阅读中文文章",
+      "详细记录了 Inset Face 插件的算法工程化方案实现。",
+    blogButton: "阅读文章",
   },
   en: {
     navFeatures: "Features",
