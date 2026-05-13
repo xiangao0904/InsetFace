@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 const REPO_URL = "https://github.com/xiangao0904/InsetFace";
 const INSTALLER_URL =
-  "https://github.com/xiangao0904/InsetFace/raw/master/installer/InsetFaceInstaller.exe";
+  "https://github.com/xiangao0904/InsetFace/releases/download/v1.0.0/InsetFaceInstaller.exe";
 const DEMO_VIDEO_URL = "/demo.mp4";
 const BLOG_URL = "https://xiangao0904.github.io/blog/insetface-algorithm";
 
