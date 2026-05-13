@@ -87,6 +87,70 @@ type Copy = {
   blogButton: string;
 };
 
+function BrandMark({ className = "h-6 w-6" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 512 512"
+      className={className}
+      aria-hidden="true"
+      fill="none"
+    >
+      <rect
+        x="80"
+        y="80"
+        width="352"
+        height="352"
+        fill="#E6E6E6"
+        stroke="#0f172a"
+        strokeWidth="24"
+        strokeLinejoin="round"
+      />
+      <rect
+        x="151"
+        y="151"
+        width="211"
+        height="211"
+        fill="#FD9EA2"
+        stroke="#0f172a"
+        strokeWidth="24"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M96 96L151 151"
+        stroke="#0f172a"
+        strokeWidth="24"
+        strokeLinecap="round"
+      />
+      <path
+        d="M96 416L151 361"
+        stroke="#0f172a"
+        strokeWidth="24"
+        strokeLinecap="round"
+      />
+      <path
+        d="M416 96L361 151"
+        stroke="#0f172a"
+        strokeWidth="24"
+        strokeLinecap="round"
+      />
+      <path
+        d="M416 416L361 361"
+        stroke="#0f172a"
+        strokeWidth="24"
+        strokeLinecap="round"
+      />
+      <circle cx="80" cy="80" r="25" fill="#E6E6E6" stroke="#0f172a" strokeWidth="20" />
+      <circle cx="80" cy="432" r="25" fill="#E6E6E6" stroke="#0f172a" strokeWidth="20" />
+      <circle cx="432" cy="80" r="25" fill="#E6E6E6" stroke="#0f172a" strokeWidth="20" />
+      <circle cx="432" cy="432" r="25" fill="#E6E6E6" stroke="#0f172a" strokeWidth="20" />
+      <circle cx="151" cy="151" r="25" fill="#FD9EA2" stroke="#0f172a" strokeWidth="20" />
+      <circle cx="151" cy="362" r="25" fill="#FD9EA2" stroke="#0f172a" strokeWidth="20" />
+      <circle cx="362" cy="151" r="25" fill="#FD9EA2" stroke="#0f172a" strokeWidth="20" />
+      <circle cx="362" cy="362" r="25" fill="#FD9EA2" stroke="#0f172a" strokeWidth="20" />
+    </svg>
+  );
+}
+
 function Icon({ name, className = "h-5 w-5" }: IconProps) {
   if (name === "github") {
     return (
@@ -925,7 +989,7 @@ export default function InsetFaceLandingPage() {
             className="flex items-center gap-2 text-xl font-bold tracking-wider text-slate-950"
             aria-label="InsetFace home"
           >
-            <Icon name="box" className="h-6 w-6 text-blue-600" />
+            <BrandMark className="h-7 w-7 shrink-0" />
             InsetFace
           </a>
           <div className="hidden items-center gap-6 text-sm font-medium text-slate-700 md:flex">
@@ -1197,7 +1261,7 @@ export default function InsetFaceLandingPage() {
         <div className="mx-auto flex max-w-6xl flex-col gap-6 text-sm text-slate-500 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="flex items-center gap-2 font-semibold text-slate-950">
-              <Icon name="check" className="h-5 w-5 text-blue-600" />
+              <BrandMark className="h-6 w-6 shrink-0" />
               InsetFace for Metasequoia 4
             </div>
             <p className="mt-2">{t.footerLang}</p>
