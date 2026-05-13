@@ -7,7 +7,7 @@ const REPO_URL = "https://github.com/xiangao0904/InsetFace";
 const INSTALLER_URL =
   "https://github.com/xiangao0904/InsetFace/releases/download/v1.0.0/InsetFaceInstaller.exe";
 const DEMO_VIDEO_URL = "/demo.mp4";
-const BLOG_URL = "https://xiangao0904.github.io/blog/insetface-algorithm";
+const BLOG_URL = "https://blog.huliawsl.top/posts/insetface";
 
 const LOCALES = ["en", "zh", "ja"] as const;
 type Locale = (typeof LOCALES)[number];
@@ -309,9 +309,9 @@ const copy: Record<Locale, Copy> = {
     featureOffsetText:
       "针对不规则多边形优化边距观感，减少窄角、斜边导致的视觉不均匀。",
     demoLabel: "Demo Video",
-    demoTitle: "为实际演示视频预留的主展示位",
+    demoTitle: "实际演示视频",
     demoText:
-      "把录屏、GIF 或 MP4 放在这里，展示拖拽 Thickness、切换 Region / Individual 和应用 Offset Even 的完整流程。",
+      "观看 InsetFace 的实际操作流程：拖拽 Thickness、切换 Region / Individual，并应用 Offset Even。",
     demoPlaceholder: "Demo video placeholder",
     demoHint:
       "将 DEMO_VIDEO_URL 替换为你的 .mp4 / .webm 地址即可自动显示视频。",
@@ -342,13 +342,13 @@ const copy: Record<Locale, Copy> = {
     apply: "Apply Inset",
     livePreview: "Live Preview",
     blogLabel: "Technical Blog",
-    blogTitle: "算法解析文章预留位",
+    blogTitle: "算法解析文章",
     blogText:
-      "后续可以在这里链接到你的个人 Blog，系统讲解内插面算法、Offset Even 的几何处理、交互式预览的数据流，以及插件实现细节。",
+      "这篇中文技术文章系统讲解 InsetFace 的内插面算法、Offset Even 的几何处理、交互式预览的数据流，以及插件实现细节。",
     blogCardTitle: "InsetFace Algorithm Notes",
     blogCardText:
       "计划中的技术文章：从选面拓扑、边界偏移、深度投影到 Metasequoia 4 插件集成。",
-    blogButton: "预留 Blog 链接",
+    blogButton: "阅读中文文章",
   },
   en: {
     navFeatures: "Features",
@@ -379,9 +379,9 @@ const copy: Record<Locale, Copy> = {
     featureOffsetText:
       "Improves visual margin consistency on irregular polygons and reduces uneven results around narrow angles and skewed edges.",
     demoLabel: "Demo Video",
-    demoTitle: "Reserved showcase area for the real demo video",
+    demoTitle: "Real demo video",
     demoText:
-      "Place your screen recording, GIF, or MP4 here to show Thickness dragging, Region / Individual switching, and Offset Even in action.",
+      "Watch the real InsetFace workflow: drag Thickness, switch Region / Individual, and apply Offset Even.",
     demoPlaceholder: "Demo video placeholder",
     demoHint:
       "Replace DEMO_VIDEO_URL with your .mp4 / .webm URL to display the real video automatically.",
@@ -451,9 +451,9 @@ const copy: Record<Locale, Copy> = {
     featureOffsetText:
       "不規則な多角形での見た目の余白を整え、狭い角や斜めの辺による不均一さを軽減します。",
     demoLabel: "Demo Video",
-    demoTitle: "実際のデモ動画用の表示エリア",
+    demoTitle: "実際のデモ動画",
     demoText:
-      "録画、GIF、MP4 をここに配置して、Thickness のドラッグ、Region / Individual の切替、Offset Even の動作を見せられます。",
+      "InsetFace の実際の操作フロー：Thickness のドラッグ、Region / Individual の切替、Offset Even の適用を確認できます。",
     demoPlaceholder: "Demo video placeholder",
     demoHint:
       "DEMO_VIDEO_URL を .mp4 / .webm の URL に置き換えると、動画が自動表示されます。",
@@ -679,33 +679,17 @@ function DemoVideoSlot({ t }: { t: Copy }) {
         <p className="mt-5 text-lg leading-8 text-slate-600">{t.demoText}</p>
       </div>
 
-      {/* 使用任意值设定精确比例 aspect-[2558/1378] */}
       <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-        {DEMO_VIDEO_URL ? (
-          <video
-            className="aspect-[2558/1378] w-full rounded-md bg-slate-100 object-cover"
-            src={DEMO_VIDEO_URL}
-            controls
-            playsInline
-            autoPlay
-            muted
-            loop
-            preload="auto"
-          />
-        ) : (
-          /* 占位图也同步修改比例，防止布局跳动 */
-          <div className="flex aspect-[2558/1378] w-full flex-col items-center justify-center rounded-md border border-dashed border-blue-300 bg-blue-50 text-center">
-            <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-md border border-blue-200 bg-white text-blue-600 shadow-sm">
-              <Icon name="play" className="h-7 w-7" />
-            </div>
-            <p className="text-xl font-semibold text-slate-950">
-              {t.demoPlaceholder}
-            </p>
-            <p className="mt-3 max-w-xl px-6 text-sm leading-6 text-slate-600">
-              {t.demoHint}
-            </p>
-          </div>
-        )}
+        <video
+          className="aspect-[2558/1378] w-full rounded-md bg-slate-100 object-cover"
+          src={DEMO_VIDEO_URL}
+          controls
+          playsInline
+          autoPlay
+          muted
+          loop
+          preload="auto"
+        />
       </div>
     </section>
   );
@@ -714,9 +698,8 @@ function DemoVideoSlot({ t }: { t: Copy }) {
 function BlogSlot({ t }: { t: Copy }) {
   const button = (
     <Button
-      disabled={!BLOG_URL}
       variant="outline"
-      className="mt-6 rounded-md border-slate-200 bg-white text-slate-500 disabled:opacity-70"
+      className="mt-6 rounded-md border-slate-200 bg-white text-slate-700 hover:bg-blue-50 hover:text-blue-700"
     >
       {t.blogButton}
       <Icon name="arrowRight" className="ml-2 h-4 w-4" />
@@ -746,7 +729,13 @@ function BlogSlot({ t }: { t: Copy }) {
               {t.blogCardTitle}
             </h3>
             <p className="mt-4 leading-7 text-slate-600">{t.blogCardText}</p>
-            {BLOG_URL ? <a href={BLOG_URL}>{button}</a> : button}
+            {BLOG_URL ? (
+              <a href={BLOG_URL} target="_blank" rel="noreferrer">
+                {button}
+              </a>
+            ) : (
+              button
+            )}
           </div>
         </div>
       </div>
@@ -934,11 +923,11 @@ function runSmokeTests() {
     );
   if (typeof DEMO_VIDEO_URL !== "string")
     failures.push(
-      "DEMO_VIDEO_URL should be a string placeholder for the real demo video.",
+      "DEMO_VIDEO_URL should be a string pointing to the real demo video.",
     );
   if (typeof BLOG_URL !== "string" || !BLOG_URL.startsWith("https://"))
     failures.push(
-      "BLOG_URL should be a valid https placeholder for the future technical blog link.",
+      "BLOG_URL should be a valid https link for the technical blog.",
     );
   for (const locale of LOCALES)
     for (const field of blogFields)
