@@ -60,7 +60,7 @@
 
 ### Recommended Method
 Run the visual installer directly:
-- **[InsetFaceInstaller.exe](path/to/your/release/InsetFaceInstaller.exe)**
+- **[InsetFaceInstaller.exe](https://github.com/xiangao0904/InsetFace/releases)**
 
 The installer will automatically:
 1. Copy `InsetFace.dll` and `InsetFace.resource.xml`.
