@@ -908,7 +908,7 @@ function runSmokeTests() {
       `InsetFace landing page smoke tests failed:\n${failures.join("\n")}`,
     );
 }
-runSmokeTests();
+if (import.meta.env.DEV) runSmokeTests();
 
 export default function InsetFaceLandingPage() {
   const [locale, setLocale] = useState<Locale>("en");

@@ -9,20 +9,20 @@
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "latest",
-    "autoprefixer": "latest",
-    "clsx": "latest",
-    "framer-motion": "latest",
-    "postcss": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "tailwind-merge": "latest",
-    "tailwindcss": "^3.4.17",
-    "typescript": "latest",
-    "vite": "latest"
+    "clsx": "2.1.1",
+    "framer-motion": "12.38.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "tailwind-merge": "3.6.0"
   },
   "devDependencies": {
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3"
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.1",
+    "autoprefixer": "10.5.0",
+    "postcss": "8.5.14",
+    "tailwindcss": "3.4.19",
+    "typescript": "6.0.3",
+    "vite": "8.0.12"
   }
 }
