@@ -3,9 +3,9 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-const REPO_URL = "https://github.com/xiangao0904/InsetFace";
+const REPO_URL = "https://github.com/InfiniteGraphics/InsetFace";
 const INSTALLER_URL =
-  "https://github.com/xiangao0904/InsetFace/releases";
+  "https://github.com/InfiniteGraphics/InsetFace/releases";
 const DEMO_VIDEO_URL = "/demo.mp4";
 const BLOG_URL = "https://blog.huliawsl.top/posts/insetface";
 
